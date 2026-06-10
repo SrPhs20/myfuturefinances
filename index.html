@@ -46,6 +46,33 @@
   </div>
 
   <div class="chart">
+  <h2>Meta mensal</h2>
+
+  <form id="formMeta">
+    <label>Quanto você quer guardar este mês?</label>
+    <input
+      id="valorMeta"
+      type="number"
+      step="0.01"
+      placeholder="Ex. 1500,00"
+      required
+    />
+    <button type="submit">Salvar meta</button>
+  </form>
+
+  <div class="meta-box">
+    <div class="bar-label">
+      <span>Progresso da meta</span>
+      <span id="porcentagemMeta">0%</span>
+    </div>
+    <div class="meta-bar">
+      <div id="barraMeta" class="meta-fill"></div>
+    </div>
+    <p id="textoMeta"></p>
+  </div>
+</div>
+
+  <div class="chart">
     <h2>Resumo inteligente</h2>
     <div id="alertaFinanceiro" class="alert-box"></div>
   </div>

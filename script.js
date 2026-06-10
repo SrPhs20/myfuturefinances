@@ -28,6 +28,7 @@ function formatarData(data) {
 function salvar() {
   localStorage.setItem("lancamentos", JSON.stringify(lancamentos));
   localStorage.setItem("contasFixas", JSON.stringify(contasFixas));
+  localStorage.setItem("metaMensal", metaMensal);
 }
 
 function mostrarAba(aba) {
@@ -68,6 +69,8 @@ function atualizarDashboard() {
     }
   });
 
+  let metaMensal = Number(localStorage.getItem("metaMensal")) || 0;
+
   const saldoAtual = receitas - despesas;
   const saldoPrevisto = saldoAtual - contasPendentes;
   const economiaMes = receitas - despesas;
@@ -91,6 +94,45 @@ function atualizarDashboard() {
   } else {
     alerta.className = "alert-box alert-success";
     alerta.innerHTML = "Boa! Seu saldo previsto está positivo considerando suas contas pendentes.";
+  }
+
+  atualizarMetaMensal();
+
+}
+
+function atualizarMetaMensal() {
+  const valorMetaInput = document.getElementById("valorMeta");
+  const barraMeta = document.getElementById("barraMeta");
+  const porcentagemMeta = document.getElementById("porcentagemMeta");
+  const textoMeta = document.getElementById("textoMeta");
+
+  if (!valorMetaInput || !barraMeta || !porcentagemMeta || !textoMeta) return;
+
+  valorMetaInput.value = metaMensal > 0 ? metaMensal : "";
+
+  let receitas = 0;
+  let despesas = 0;
+  const mesAtual = hojeTexto().slice(0, 7);
+
+  lancamentos.forEach(item => {
+    if (item.data && item.data.slice(0, 7) === mesAtual) {
+      if (item.tipo === "receita") receitas += Number(item.valor);
+      if (item.tipo === "despesa") despesas += Number(item.valor);
+    }
+  });
+
+  const economia = receitas - despesas;
+  const progresso = metaMensal > 0 ? Math.min((economia / metaMensal) * 100, 100) : 0;
+
+  barraMeta.style.width = `${Math.max(progresso, 0)}%`;
+  porcentagemMeta.textContent = `${Math.round(Math.max(progresso, 0))}%`;
+
+  if (metaMensal <= 0) {
+    textoMeta.textContent = "Defina uma meta mensal para acompanhar seu progresso.";
+  } else if (economia >= metaMensal) {
+    textoMeta.textContent = "Parabéns! Você atingiu sua meta mensal.";
+  } else {
+    textoMeta.textContent = `Faltam ${formatarMoeda(metaMensal - economia)} para atingir sua meta.`;
   }
 }
 
@@ -415,6 +457,20 @@ flatpickr("#dataVencimentoConta", {
   altFormat: "d/m/Y",
   locale: "pt",
   defaultDate: "today"
+});
+
+document.getElementById("formMeta").addEventListener("submit", function(e) {
+  e.preventDefault();
+
+  metaMensal = Number(document.getElementById("valorMeta").value);
+
+  if (metaMensal <= 0) {
+    alert("Digite uma meta maior que zero.");
+    return;
+  }
+
+  salvar();
+  atualizarDashboard();
 });
 
 atualizarTela();
