@@ -31,14 +31,67 @@ function salvar() {
 }
 
 function mostrarAba(aba) {
+  document.getElementById("abaDashboard").classList.toggle("hidden", aba !== "dashboard");
   document.getElementById("abaLancamentos").classList.toggle("hidden", aba !== "lancamentos");
   document.getElementById("abaContas").classList.toggle("hidden", aba !== "contas");
 
   const tabs = document.querySelectorAll(".tab");
   tabs.forEach(tab => tab.classList.remove("active"));
 
-  if (aba === "lancamentos") tabs[0].classList.add("active");
-  if (aba === "contas") tabs[1].classList.add("active");
+  if (aba === "dashboard") tabs[0].classList.add("active");
+  if (aba === "lancamentos") tabs[1].classList.add("active");
+  if (aba === "contas") tabs[2].classList.add("active");
+}
+
+function atualizarDashboard() {
+  let receitas = 0;
+  let despesas = 0;
+  let contasPendentes = 0;
+
+  const hoje = hojeTexto();
+  const mesAtual = hoje.slice(0, 7);
+
+  lancamentos.forEach(item => {
+    if (item.data && item.data.slice(0, 7) === mesAtual) {
+      if (item.tipo === "receita") receitas += Number(item.valor);
+      if (item.tipo === "despesa") despesas += Number(item.valor);
+    }
+  });
+
+  contasFixas.forEach(conta => {
+    if (conta.vencimento >= hoje) {
+      contasPendentes += Number(conta.valor);
+    }
+
+    if (conta.vencimento < hoje) {
+      contasPendentes += Number(conta.valor);
+    }
+  });
+
+  const saldoAtual = receitas - despesas;
+  const saldoPrevisto = saldoAtual - contasPendentes;
+  const economiaMes = receitas - despesas;
+
+  document.getElementById("dashSaldoAtual").textContent = formatarMoeda(saldoAtual);
+  document.getElementById("dashContasPendentes").textContent = formatarMoeda(contasPendentes);
+  document.getElementById("dashSaldoPrevisto").textContent = formatarMoeda(saldoPrevisto);
+  document.getElementById("dashEconomiaMes").textContent = formatarMoeda(economiaMes);
+
+  const alerta = document.getElementById("alertaFinanceiro");
+
+  if (receitas === 0 && despesas === 0) {
+    alerta.className = "alert-box alert-neutral";
+    alerta.innerHTML = "Adicione seus lançamentos para gerar uma análise financeira.";
+  } else if (saldoPrevisto < 0) {
+    alerta.className = "alert-box alert-danger";
+    alerta.innerHTML = "Atenção: considerando suas contas pendentes, seu saldo previsto está negativo.";
+  } else if (despesas > receitas * 0.8) {
+    alerta.className = "alert-box alert-warning";
+    alerta.innerHTML = "Cuidado: suas despesas já estão consumindo grande parte das receitas do mês.";
+  } else {
+    alerta.className = "alert-box alert-success";
+    alerta.innerHTML = "Boa! Seu saldo previsto está positivo considerando suas contas pendentes.";
+  }
 }
 
 function atualizarTela() {
@@ -95,6 +148,7 @@ function atualizarTela() {
 
   atualizarGrafico();
   atualizarContasFixas();
+  atualizarDashboard();
 }
 
 form.addEventListener("submit", function(e) {

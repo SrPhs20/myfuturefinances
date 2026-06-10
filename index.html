@@ -17,11 +17,41 @@
     </header>
 
     <div class="tabs">
-      <button class="tab active" onclick="mostrarAba('lancamentos')">Lançamentos</button>
-      <button class="tab" onclick="mostrarAba('contas')">Contas Fixas</button>
+  <button class="tab active" onclick="mostrarAba('dashboard')">Dashboard</button>
+  <button class="tab" onclick="mostrarAba('lancamentos')">Lançamentos</button>
+  <button class="tab" onclick="mostrarAba('contas')">Contas Fixas</button>
+  </div>
+
+  <section id="abaDashboard">
+  <div class="cards">
+    <div class="card">
+      <h2>Saldo atual</h2>
+      <div id="dashSaldoAtual" class="value blue">R$ 0,00</div>
     </div>
 
-    <section id="abaLancamentos">
+    <div class="card">
+      <h2>Contas pendentes</h2>
+      <div id="dashContasPendentes" class="value negative">R$ 0,00</div>
+    </div>
+
+    <div class="card">
+      <h2>Saldo previsto</h2>
+      <div id="dashSaldoPrevisto" class="value positive">R$ 0,00</div>
+    </div>
+
+    <div class="card">
+      <h2>Economia do mês</h2>
+      <div id="dashEconomiaMes" class="value blue">R$ 0,00</div>
+    </div>
+  </div>
+
+  <div class="chart">
+    <h2>Resumo inteligente</h2>
+    <div id="alertaFinanceiro" class="alert-box"></div>
+  </div>
+</section>
+
+    <section id="abaLancamentos" class="hidden">
       <div class="cards">
         <div class="card">
           <h2>Receitas</h2>
