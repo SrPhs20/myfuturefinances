@@ -14,32 +14,67 @@ let calendarioData;
 let calendarioVencimento;
 
 const appContainer = document.querySelector(".container");
+appContainer.classList.add("hidden");
 
 document.body.insertAdjacentHTML("afterbegin", `
-  <section id="authScreen" class="auth-screen">
-    <div class="auth-card">
-      <h1>Minhas Finanças</h1>
-      <p>Entre na sua conta para sincronizar seus dados.</p>
+<section id="authScreen" class="auth-screen">
 
-     <label>Nome</label>
-<input id="authNome" type="text" placeholder="Seu nome" />
+  <div class="auth-card" id="loginBox">
 
-<label>Foto de perfil</label>
-<input id="authFoto" type="file" accept="image/*" />
+    <h1>Minhas Finanças</h1>
+    <p>Entre na sua conta</p>
 
-<label>Email</label>
-<input id="authEmail" type="email" placeholder="seuemail@email.com" />
+    <label>Email</label>
+    <input id="authEmail" type="email" placeholder="Seu email" />
 
-<label>Senha</label>
-<input id="authSenha" type="password" placeholder="Sua senha" />
+    <label>Senha</label>
+    <input id="authSenha" type="password" placeholder="Sua senha" />
 
-      <button onclick="entrar()">Entrar</button>
-      <button class="secondary" onclick="cadastrar()">Criar conta</button>
+    <button onclick="entrar()">Entrar</button>
 
-      <p id="authMensagem"></p>
-    </div>
-  </section>
+    <button class="secondary" onclick="mostrarCadastro()">
+      Criar conta
+    </button>
+
+    <p id="authMensagem"></p>
+
+  </div>
+
+  <div class="auth-card hidden" id="cadastroBox">
+
+    <h1>Criar conta</h1>
+
+    <label>Nome</label>
+    <input id="authNome" type="text" placeholder="Seu nome" />
+
+    <label>Email</label>
+    <input id="authEmailCadastro" type="email" placeholder="Seu email" />
+
+    <label>Senha</label>
+    <input id="authSenhaCadastro" type="password" placeholder="Sua senha" />
+
+    <button onclick="cadastrar()">
+      Criar conta
+    </button>
+
+    <button class="secondary" onclick="mostrarLogin()">
+      Voltar para login
+    </button>
+
+  </div>
+
+</section>
 `);
+
+function mostrarCadastro() {
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("cadastroBox").classList.remove("hidden");
+}
+
+function mostrarLogin() {
+  document.getElementById("cadastroBox").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+}
 
 appContainer.insertAdjacentHTML("afterbegin", `
   <div class="user-bar">
@@ -103,26 +138,23 @@ function mostrarMensagemAuth(texto) {
 
 async function cadastrar() {
   const nome = document.getElementById("authNome").value.trim();
-  const email = document.getElementById("authEmail").value.trim();
-  const senha = document.getElementById("authSenha").value.trim();
-  const foto = document.getElementById("authFoto").files[0];
+
+const email = document
+  .getElementById("authEmailCadastro")
+  .value.trim();
+
+const senha = document
+  .getElementById("authSenhaCadastro")
+  .value.trim();
 
   if (!nome || !email || !senha) {
-    mostrarMensagemAuth("Digite nome, email e senha.");
+    mostrarMensagemAuth("Preencha todos os campos.");
     return;
   }
 
-  const avatarUrl = foto ? await converterImagemParaBase64(foto) : "";
-
   const { data, error } = await supabaseClient.auth.signUp({
     email,
-    password: senha,
-    options: {
-      data: {
-        nome,
-        avatar_url: avatarUrl
-      }
-    }
+    password: senha
   });
 
   if (error) {
@@ -133,12 +165,18 @@ async function cadastrar() {
   if (data.user) {
     await supabaseClient.from("perfis").insert([{
       user_id: data.user.id,
-      nome,
-      avatar_url: avatarUrl
+      nome: nome,
+      avatar_url: ""
     }]);
   }
 
-  mostrarMensagemAuth("Conta criada. Agora faça login.");
+  document.getElementById("authSenha").value = "";
+
+  alert("Conta criada com sucesso.");
+
+mostrarLogin();
+
+document.getElementById("authSenhaCadastro").value = "";
 }
 
 async function entrar() {
@@ -175,6 +213,7 @@ async function verificarSessao() {
   const { data } = await supabaseClient.auth.getSession();
 
   if (data.session) {
+    document.getElementById("modalPerfil").classList.add("hidden");
     usuarioAtual = data.session.user;
     await iniciarApp();
   } else {
@@ -184,14 +223,20 @@ async function verificarSessao() {
 }
 
 async function iniciarApp() {
+
   authScreen.classList.add("hidden");
+
   appContainer.classList.remove("hidden");
 
   await carregarPerfil();
   await carregarDados();
+
   configurarCalendarios();
+
   atualizarTela();
   atualizarContasFixas();
+
+  fecharPerfil();
 }
 
 async function carregarDados() {
@@ -870,8 +915,8 @@ function fecharPerfil() {
 }
 
 async function salvarPerfil() {
+
   const nome = document.getElementById("perfilNome").value.trim();
-  const foto = document.getElementById("perfilFoto").files[0];
 
   if (!nome) {
     alert("Digite seu nome.");
@@ -880,37 +925,57 @@ async function salvarPerfil() {
 
   let avatarUrl = perfilAtual?.avatar_url || "";
 
+  const foto = document.getElementById("perfilFoto").files[0];
+
   if (foto) {
     avatarUrl = await converterImagemParaBase64(foto);
   }
 
-  const dadosPerfil = {
+  const dados = {
     user_id: usuarioAtual.id,
     nome,
     avatar_url: avatarUrl
   };
 
-  if (perfilAtual) {
-    await supabaseClient
+  const { data: perfilExistente } = await supabaseClient
+    .from("perfis")
+    .select("id")
+    .eq("user_id", usuarioAtual.id)
+    .maybeSingle();
+
+  let error;
+
+  if (perfilExistente) {
+
+    const resultado = await supabaseClient
       .from("perfis")
-      .update(dadosPerfil)
+      .update({
+        nome,
+        avatar_url: avatarUrl
+      })
       .eq("user_id", usuarioAtual.id);
+
+    error = resultado.error;
+
   } else {
-    await supabaseClient
+
+    const resultado = await supabaseClient
       .from("perfis")
-      .insert([dadosPerfil]);
+      .insert([dados]);
+
+    error = resultado.error;
   }
 
-  await supabaseClient.auth.updateUser({
-    data: {
-      nome,
-      avatar_url: avatarUrl
-    }
-  });
+  if (error) {
+    alert(error.message);
+    return;
+  }
 
   await carregarPerfil();
+
   fecharPerfil();
-  alert("Perfil atualizado!");
+
+  alert("Perfil atualizado com sucesso.");
 }
 
 async function excluirPerfil() {

@@ -668,3 +668,11 @@ span.flatpickr-weekday {
   justify-self: center;
   border: 3px solid #2563eb;
 }
+
+.profile-modal.hidden {
+  display: none !important;
+}
+
+.auth-screen.hidden {
+  display: none !important;
+}
