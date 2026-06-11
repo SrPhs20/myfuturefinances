@@ -1,4 +1,4 @@
-SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
+const SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYWZ5bHpucHJpYm1wdW1jZ3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzA1NzcsImV4cCI6MjA5NjcwNjU3N30.a1Tg7EAsusekhQ3gdUopSE4b0MDSbP-YQEiv3khQeI4";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -71,16 +71,6 @@ document.body.insertAdjacentHTML("afterbegin", `
 
 document.getElementById("loginBox").classList.remove("hidden");
 document.getElementById("cadastroBox").classList.add("hidden");
-
-function mostrarCadastro() {
-  document.getElementById("loginBox").classList.add("hidden");
-  document.getElementById("cadastroBox").classList.remove("hidden");
-}
-
-function mostrarLogin() {
-  document.getElementById("cadastroBox").classList.add("hidden");
-  document.getElementById("loginBox").classList.remove("hidden");
-}
 
 appContainer.insertAdjacentHTML("afterbegin", `
   <div class="user-bar">
@@ -687,8 +677,10 @@ function atualizarDashboard() {
   });
 
   contasFixas.forEach(conta => {
-    contasPendentes += Number(conta.valor);
-  });
+  contasPendentes += Number(conta.valor);
+});
+
+contasPendentes += parcelasCartaoDoMesAtual();
 
   const saldoAtual = receitas - despesas;
   const saldoPrevisto = saldoAtual - contasPendentes;
@@ -1070,11 +1062,10 @@ formCartao.addEventListener("submit", async function(e) {
 
   await carregarDados();
 
-  atualizarCartoes();
-  atualizarDashboard();
-  limparFormularioCartao();
+atualizarTudo();
+limparFormularioCartao();
 
-  alert(editandoCartaoId ? "Parcelamento atualizado!" : "Compra parcelada adicionada!");
+alert(editandoCartaoId ? "Parcelamento atualizado!" : "Compra parcelada adicionada!");
 });
 
 function atualizarCartoes() {
@@ -1151,7 +1142,14 @@ function atualizarCartoes() {
     }
 
     const div = document.createElement("div");
-    div.className = "fixed-bill";
+    const mesAtual = hojeTexto().slice(0, 7);
+const parcelaEhDoMesAtual =
+  item.proximoVencimento &&
+  item.proximoVencimento.slice(0, 7) === mesAtual;
+
+div.className = parcelaEhDoMesAtual || restantes <= 0
+  ? "fixed-bill"
+  : "fixed-bill cartao-futuro";
 
     div.innerHTML = `
       <div>
@@ -1161,10 +1159,18 @@ function atualizarCartoes() {
           ${item.cartao_final ? " • Final " + item.cartao_final : ""}
         </p>
 
-        <p>
-          Próxima fatura:
-          ${item.proximoVencimento ? formatarData(item.proximoVencimento) : "Quitado"}
-        </p>
+      <p>
+  Próxima fatura:
+  ${item.proximoVencimento ? formatarData(item.proximoVencimento) : "Quitado"}
+</p>
+
+<p>
+  ${
+    item.proximoVencimento && item.proximoVencimento.slice(0, 7) === hojeTexto().slice(0, 7)
+      ? "Esta parcela entra nas pendências deste mês."
+      : "Esta parcela ainda não entra nas pendências deste mês."
+  }
+</p>
 
         <p>
           ${item.total_parcelas}x de ${formatarMoeda(valorParcela)}
@@ -1221,7 +1227,9 @@ async function pagarParcelaCartao(id) {
       descricao: `${item.cartao_nome} - ${item.descricao} (${novasPagas}/${item.total_parcelas})`,
       valor: valorParcela,
       data: hojeTexto(),
-      user_id: usuarioAtual.id
+      user_id: usuarioAtual.id,
+      origem: "cartao",
+      origem_id: item.id
     }]);
 
   if (erroLancamento) {
@@ -1244,14 +1252,29 @@ async function pagarParcelaCartao(id) {
   }
 
   await carregarDados();
-  atualizarTela();
-  atualizarCartoes();
+  atualizarTudo();
 
   alert("Parcela paga e adicionada aos lançamentos!");
 }
 
 async function excluirParcelamento(id) {
-  if (!confirm("Deseja excluir este parcelamento?")) return;
+  const confirmar = confirm(
+    "Deseja excluir este parcelamento?\n\nAs parcelas lançadas por ele também serão removidas dos lançamentos."
+  );
+
+  if (!confirmar) return;
+
+  const { error: erroLancamentos } = await supabaseClient
+    .from("lancamentos")
+    .delete()
+    .eq("user_id", usuarioAtual.id)
+    .eq("origem", "cartao")
+    .eq("origem_id", id);
+
+  if (erroLancamentos) {
+    alert("Erro ao excluir lançamentos vinculados ao cartão.");
+    return;
+  }
 
   const { error } = await supabaseClient
     .from("cartoes_parcelas")
@@ -1265,8 +1288,7 @@ async function excluirParcelamento(id) {
   }
 
   await carregarDados();
-  atualizarCartoes();
-  atualizarDashboard();
+  atualizarTudo();
 }
 
 function mostrarCadastro() {
@@ -1347,4 +1369,31 @@ function editarParcelamento(id) {
     behavior: "smooth",
     block: "start"
   });
+}
+
+function parcelasCartaoDoMesAtual() {
+  const mesAtual = hojeTexto().slice(0, 7);
+  let total = 0;
+
+  cartoesParcelados.forEach(item => {
+    const proximoVencimento = calcularProximoVencimento(item);
+
+    if (!proximoVencimento) return;
+
+    const mesParcela = proximoVencimento.slice(0, 7);
+
+    if (mesParcela === mesAtual) {
+      const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
+      total += valorParcela;
+    }
+  });
+
+  return total;
+}
+
+function atualizarTudo() {
+  atualizarTela();
+  atualizarContasFixas();
+  atualizarCartoes();
+  atualizarDashboard();
 }

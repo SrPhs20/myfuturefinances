@@ -675,3 +675,13 @@ span.flatpickr-weekday {
 .auth-screen.hidden {
   display: none !important;
 }
+
+.cartao-futuro {
+  opacity: 0.55;
+  background: #f1f5f9;
+  filter: grayscale(0.25);
+}
+
+.cartao-futuro:hover {
+  opacity: 0.85;
+}
