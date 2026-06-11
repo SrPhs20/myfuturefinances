@@ -35,9 +35,8 @@ header p {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
-
 .tabs {
   display: flex;
   gap: 12px;

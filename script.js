@@ -1,4 +1,4 @@
-const SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
+SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYWZ5bHpucHJpYm1wdW1jZ3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzA1NzcsImV4cCI6MjA5NjcwNjU3N30.a1Tg7EAsusekhQ3gdUopSE4b0MDSbP-YQEiv3khQeI4";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -65,6 +65,9 @@ document.body.insertAdjacentHTML("afterbegin", `
 
 </section>
 `);
+
+document.getElementById("loginBox").classList.remove("hidden");
+document.getElementById("cadastroBox").classList.add("hidden");
 
 function mostrarCadastro() {
   document.getElementById("loginBox").classList.add("hidden");
@@ -993,4 +996,14 @@ async function excluirPerfil() {
   await sair();
 
   alert("Seu perfil e dados foram excluídos deste app.");
+}
+
+function mostrarCadastro() {
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("cadastroBox").classList.remove("hidden");
+}
+
+function mostrarLogin() {
+  document.getElementById("cadastroBox").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
 }
