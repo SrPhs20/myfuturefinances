@@ -15,6 +15,7 @@ let calendarioData;
 let calendarioVencimento;
 let editandoCartaoId = null;
 let calendarioCartaoPrimeiraParcela;
+let editandoContaFixaId = null;
 
 const appContainer = document.querySelector(".container");
 appContainer.classList.add("hidden");
@@ -108,6 +109,17 @@ const authScreen = document.getElementById("authScreen");
 const form = document.getElementById("form");
 const lista = document.getElementById("lista");
 const formContaFixa = document.getElementById("formContaFixa");
+const botaoContaFixa = document.getElementById("botaoContaFixa");
+const botaoCancelarEdicaoContaFixa =
+  document.getElementById("cancelarEdicaoContaFixa");
+
+if (botaoCancelarEdicaoContaFixa) {
+  botaoCancelarEdicaoContaFixa.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    cancelarEdicaoContaFixa();
+  });
+}
 const botaoLancamento = document.getElementById("botaoLancamento");
 const avisoEdicao = document.getElementById("avisoEdicao");
 
@@ -491,41 +503,53 @@ async function remover(id) {
 formContaFixa.addEventListener("submit", async function(e) {
   e.preventDefault();
 
-  const novaConta = {
+  const dadosConta = {
     nome: document.getElementById("nomeConta").value.trim(),
     valor: Number(document.getElementById("valorConta").value),
     vencimento: document.getElementById("dataVencimentoConta").value || hojeTexto(),
     user_id: usuarioAtual.id
   };
 
-  if (!novaConta.nome) {
+  if (!dadosConta.nome) {
     alert("Digite o nome da conta.");
     return;
   }
 
-  if (novaConta.valor <= 0) {
+  if (dadosConta.valor <= 0) {
     alert("Digite um valor maior que zero.");
     return;
   }
 
-  const { error } = await supabaseClient
-    .from("contas_fixas")
-    .insert([novaConta]);
+  let resposta;
 
-  if (error) {
-    alert("Erro ao adicionar conta fixa.");
+  if (editandoContaFixaId) {
+    resposta = await supabaseClient
+      .from("contas_fixas")
+      .update(dadosConta)
+      .eq("id", editandoContaFixaId)
+      .eq("user_id", usuarioAtual.id);
+  } else {
+    resposta = await supabaseClient
+      .from("contas_fixas")
+      .insert([dadosConta]);
+  }
+
+  if (resposta.error) {
+    alert("Erro ao salvar conta fixa.");
     return;
   }
 
+  const estavaEditando = !!editandoContaFixaId;
+
   await carregarDados();
-  atualizarContasFixas();
-  atualizarDashboard();
+  atualizarTudo();
+  limparFormularioContaFixa();
 
-  formContaFixa.reset();
-
-  if (calendarioVencimento) {
-    calendarioVencimento.setDate(hojeTexto(), true);
-  }
+  alert(
+    estavaEditando
+      ? "Conta fixa atualizada!"
+      : "Conta fixa adicionada!"
+  );
 });
 
 async function removerContaFixa(id) {
@@ -542,9 +566,12 @@ async function removerContaFixa(id) {
     return;
   }
 
+  if (editandoContaFixaId === id) {
+    limparFormularioContaFixa();
+  }
+
   await carregarDados();
-  atualizarContasFixas();
-  atualizarDashboard();
+  atualizarTudo();
 }
 
 async function pagarContaFixa(id) {
@@ -656,10 +683,11 @@ div.className = contaEhDoMesAtual
         <span class="status ${classeStatus}">${status}</span>
       </div>
 
-      <div class="bill-actions">
-        <button type="button" onclick="pagarContaFixa(${conta.id})">Marcar como paga</button>
-        <button type="button" class="danger" onclick="removerContaFixa(${conta.id})">Excluir</button>
-      </div>
+    <div class="bill-actions">
+  <button type="button" onclick="pagarContaFixa(${conta.id})">Marcar como paga</button>
+  <button type="button" onclick="editarContaFixa(${conta.id})">Editar</button>
+  <button type="button" class="danger" onclick="removerContaFixa(${conta.id})">Excluir</button>
+</div>
     `;
 
     listaContas.appendChild(div);
@@ -1439,6 +1467,51 @@ function parcelasCartaoDoMesAtual() {
   });
 
   return total;
+}
+
+function limparFormularioContaFixa() {
+  formContaFixa.reset();
+
+  if (calendarioVencimento) {
+    calendarioVencimento.setDate(hojeTexto(), true);
+  } else {
+    document.getElementById("dataVencimentoConta").value = hojeTexto();
+  }
+
+  editandoContaFixaId = null;
+
+  document.getElementById("botaoContaFixa").textContent = "Adicionar conta fixa";
+  document.getElementById("cancelarEdicaoContaFixa").classList.add("hidden");
+}
+
+function cancelarEdicaoContaFixa() {
+  limparFormularioContaFixa();
+}
+
+function editarContaFixa(id) {
+  const conta = contasFixas.find(c => c.id === id);
+  if (!conta) return;
+
+  editandoContaFixaId = id;
+
+  document.getElementById("nomeConta").value = conta.nome || "";
+  document.getElementById("valorConta").value = conta.valor || "";
+
+  if (calendarioVencimento) {
+    calendarioVencimento.setDate(conta.vencimento, true);
+  } else {
+    document.getElementById("dataVencimentoConta").value = conta.vencimento;
+  }
+
+  document.getElementById("botaoContaFixa").textContent = "Salvar alterações";
+  document.getElementById("cancelarEdicaoContaFixa").classList.remove("hidden");
+
+  mostrarAba("contas");
+
+  formContaFixa.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
 }
 
 function atualizarTudo() {
