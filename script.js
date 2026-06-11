@@ -1,11 +1,47 @@
-let lancamentos = JSON.parse(localStorage.getItem("lancamentos")) || [];
-let contasFixas = JSON.parse(localStorage.getItem("contasFixas")) || [];
-let metaMensal = Number(localStorage.getItem("metaMensal")) || 0;
+const SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYWZ5bHpucHJpYm1wdW1jZ3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzA1NzcsImV4cCI6MjA5NjcwNjU3N30.a1Tg7EAsusekhQ3gdUopSE4b0MDSbP-YQEiv3khQeI4";
 
-let editandoIndex = null;
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let usuarioAtual = null;
+let lancamentos = [];
+let contasFixas = [];
+let metaMensal = 0;
+
+let editandoId = null;
 let calendarioData;
 let calendarioVencimento;
 
+const appContainer = document.querySelector(".container");
+
+document.body.insertAdjacentHTML("afterbegin", `
+  <section id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <h1>Minhas Finanças</h1>
+      <p>Entre na sua conta para sincronizar seus dados.</p>
+
+      <label>Email</label>
+      <input id="authEmail" type="email" placeholder="seuemail@email.com" />
+
+      <label>Senha</label>
+      <input id="authSenha" type="password" placeholder="Sua senha" />
+
+      <button onclick="entrar()">Entrar</button>
+      <button class="secondary" onclick="cadastrar()">Criar conta</button>
+
+      <p id="authMensagem"></p>
+    </div>
+  </section>
+`);
+
+appContainer.insertAdjacentHTML("afterbegin", `
+  <div class="user-bar">
+    <span id="usuarioLogado"></span>
+    <button class="secondary small-button" onclick="sair()">Sair</button>
+  </div>
+`);
+
+const authScreen = document.getElementById("authScreen");
 const form = document.getElementById("form");
 const lista = document.getElementById("lista");
 const formContaFixa = document.getElementById("formContaFixa");
@@ -29,10 +65,108 @@ function formatarData(data) {
   return `${partes[2]}/${partes[1]}/${partes[0]}`;
 }
 
-function salvar() {
-  localStorage.setItem("lancamentos", JSON.stringify(lancamentos));
-  localStorage.setItem("contasFixas", JSON.stringify(contasFixas));
-  localStorage.setItem("metaMensal", metaMensal);
+function mostrarMensagemAuth(texto) {
+  document.getElementById("authMensagem").textContent = texto;
+}
+
+async function cadastrar() {
+  const email = document.getElementById("authEmail").value.trim();
+  const senha = document.getElementById("authSenha").value.trim();
+
+  if (!email || !senha) {
+    mostrarMensagemAuth("Digite email e senha.");
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.signUp({
+    email,
+    password: senha
+  });
+
+  if (error) {
+    mostrarMensagemAuth(error.message);
+    return;
+  }
+
+  mostrarMensagemAuth("Conta criada. Verifique seu email para confirmar o cadastro.");
+}
+
+async function entrar() {
+  const email = document.getElementById("authEmail").value.trim();
+  const senha = document.getElementById("authSenha").value.trim();
+
+  if (!email || !senha) {
+    mostrarMensagemAuth("Digite email e senha.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password: senha
+  });
+
+  if (error) {
+    mostrarMensagemAuth(error.message);
+    return;
+  }
+
+  usuarioAtual = data.user;
+  await iniciarApp();
+}
+
+async function sair() {
+  await supabaseClient.auth.signOut();
+  usuarioAtual = null;
+  appContainer.classList.add("hidden");
+  authScreen.classList.remove("hidden");
+}
+
+async function verificarSessao() {
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (data.session) {
+    usuarioAtual = data.session.user;
+    await iniciarApp();
+  } else {
+    appContainer.classList.add("hidden");
+    authScreen.classList.remove("hidden");
+  }
+}
+
+async function iniciarApp() {
+  authScreen.classList.add("hidden");
+  appContainer.classList.remove("hidden");
+
+  document.getElementById("usuarioLogado").textContent = usuarioAtual.email;
+
+  await carregarDados();
+  configurarCalendarios();
+  atualizarTela();
+  atualizarContasFixas();
+}
+
+async function carregarDados() {
+  const { data: dadosLancamentos } = await supabaseClient
+    .from("lancamentos")
+    .select("*")
+    .eq("user_id", usuarioAtual.id)
+    .order("data", { ascending: false });
+
+  const { data: dadosContas } = await supabaseClient
+    .from("contas_fixas")
+    .select("*")
+    .eq("user_id", usuarioAtual.id)
+    .order("vencimento", { ascending: true });
+
+  const { data: dadosMetas } = await supabaseClient
+    .from("metas")
+    .select("*")
+    .eq("user_id", usuarioAtual.id)
+    .limit(1);
+
+  lancamentos = dadosLancamentos || [];
+  contasFixas = dadosContas || [];
+  metaMensal = dadosMetas && dadosMetas.length > 0 ? Number(dadosMetas[0].valor) : 0;
 }
 
 function mostrarAba(aba) {
@@ -48,16 +182,36 @@ function mostrarAba(aba) {
   if (aba === "contas") tabs[2].classList.add("active");
 }
 
+function configurarCalendarios() {
+  if (!calendarioData) {
+    calendarioData = flatpickr("#data", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d/m/Y",
+      locale: "pt",
+      defaultDate: hojeTexto()
+    });
+  }
+
+  if (!calendarioVencimento) {
+    calendarioVencimento = flatpickr("#dataVencimentoConta", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d/m/Y",
+      locale: "pt",
+      defaultDate: hojeTexto()
+    });
+  }
+}
+
 function limparFormularioLancamento() {
   form.reset();
 
   if (calendarioData) {
     calendarioData.setDate(hojeTexto(), true);
-  } else {
-    document.getElementById("data").value = hojeTexto();
   }
 
-  editandoIndex = null;
+  editandoId = null;
   botaoLancamento.textContent = "Adicionar lançamento";
   avisoEdicao.classList.add("hidden");
 }
@@ -95,7 +249,6 @@ function atualizarTela() {
   });
 
   filtrados.forEach(item => {
-    const indexOriginal = lancamentos.indexOf(item);
     const tr = document.createElement("tr");
 
     tr.innerHTML = `
@@ -107,8 +260,8 @@ function atualizarTela() {
         ${formatarMoeda(item.valor)}
       </td>
       <td>
-        <button type="button" onclick="editarLancamento(${indexOriginal})">Editar</button>
-        <button type="button" class="danger" onclick="remover(${indexOriginal})">Excluir</button>
+        <button type="button" onclick="editarLancamento(${item.id})">Editar</button>
+        <button type="button" class="danger" onclick="remover(${item.id})">Excluir</button>
       </td>
     `;
 
@@ -123,7 +276,7 @@ function atualizarTela() {
   atualizarDashboard();
 }
 
-form.addEventListener("submit", function(e) {
+form.addEventListener("submit", async function(e) {
   e.preventDefault();
 
   const novo = {
@@ -131,7 +284,8 @@ form.addEventListener("submit", function(e) {
     categoria: document.getElementById("categoria").value.trim(),
     descricao: document.getElementById("descricao").value.trim(),
     valor: Number(document.getElementById("valor").value),
-    data: document.getElementById("data").value || hojeTexto()
+    data: document.getElementById("data").value || hojeTexto(),
+    user_id: usuarioAtual.id
   };
 
   if (!novo.categoria || !novo.descricao) {
@@ -144,23 +298,39 @@ form.addEventListener("submit", function(e) {
     return;
   }
 
-  if (editandoIndex !== null) {
-    lancamentos[editandoIndex] = novo;
+  if (editandoId) {
+    const { error } = await supabaseClient
+      .from("lancamentos")
+      .update(novo)
+      .eq("id", editandoId)
+      .eq("user_id", usuarioAtual.id);
+
+    if (error) {
+      alert("Erro ao editar lançamento.");
+      return;
+    }
   } else {
-    lancamentos.push(novo);
+    const { error } = await supabaseClient
+      .from("lancamentos")
+      .insert([novo]);
+
+    if (error) {
+      alert("Erro ao adicionar lançamento.");
+      return;
+    }
   }
 
-  salvar();
+  await carregarDados();
   atualizarTela();
   limparFormularioLancamento();
 });
 
-function editarLancamento(index) {
-  const item = lancamentos[index];
+function editarLancamento(id) {
+  const item = lancamentos.find(l => l.id === id);
 
   if (!item) return;
 
-  editandoIndex = index;
+  editandoId = id;
 
   document.getElementById("tipo").value = item.tipo;
   document.getElementById("categoria").value = item.categoria;
@@ -169,8 +339,6 @@ function editarLancamento(index) {
 
   if (calendarioData) {
     calendarioData.setDate(item.data, true);
-  } else {
-    document.getElementById("data").value = item.data;
   }
 
   botaoLancamento.textContent = "Salvar alterações";
@@ -186,30 +354,36 @@ function editarLancamento(index) {
   }, 100);
 }
 
-function remover(index) {
+async function remover(id) {
   const confirmar = confirm(
     "Tem certeza que deseja excluir este lançamento?\n\nEssa ação não poderá ser desfeita."
   );
 
   if (!confirmar) return;
 
-  lancamentos.splice(index, 1);
+  const { error } = await supabaseClient
+    .from("lancamentos")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", usuarioAtual.id);
 
-  if (editandoIndex === index) {
-    limparFormularioLancamento();
+  if (error) {
+    alert("Erro ao excluir lançamento.");
+    return;
   }
 
-  salvar();
+  await carregarDados();
   atualizarTela();
 }
 
-formContaFixa.addEventListener("submit", function(e) {
+formContaFixa.addEventListener("submit", async function(e) {
   e.preventDefault();
 
   const novaConta = {
     nome: document.getElementById("nomeConta").value.trim(),
     valor: Number(document.getElementById("valorConta").value),
-    vencimento: document.getElementById("dataVencimentoConta").value || hojeTexto()
+    vencimento: document.getElementById("dataVencimentoConta").value || hojeTexto(),
+    user_id: usuarioAtual.id
   };
 
   if (!novaConta.nome) {
@@ -222,8 +396,16 @@ formContaFixa.addEventListener("submit", function(e) {
     return;
   }
 
-  contasFixas.push(novaConta);
-  salvar();
+  const { error } = await supabaseClient
+    .from("contas_fixas")
+    .insert([novaConta]);
+
+  if (error) {
+    alert("Erro ao adicionar conta fixa.");
+    return;
+  }
+
+  await carregarDados();
   atualizarContasFixas();
   atualizarDashboard();
 
@@ -231,36 +413,66 @@ formContaFixa.addEventListener("submit", function(e) {
 
   if (calendarioVencimento) {
     calendarioVencimento.setDate(hojeTexto(), true);
-  } else {
-    document.getElementById("dataVencimentoConta").value = hojeTexto();
   }
 });
 
-function removerContaFixa(index) {
-  if (confirm("Deseja excluir esta conta fixa?")) {
-    contasFixas.splice(index, 1);
-    salvar();
-    atualizarContasFixas();
-    atualizarDashboard();
+async function removerContaFixa(id) {
+  if (!confirm("Deseja excluir esta conta fixa?")) return;
+
+  const { error } = await supabaseClient
+    .from("contas_fixas")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", usuarioAtual.id);
+
+  if (error) {
+    alert("Erro ao excluir conta fixa.");
+    return;
   }
+
+  await carregarDados();
+  atualizarContasFixas();
+  atualizarDashboard();
 }
 
-function pagarContaFixa(index) {
-  const conta = contasFixas[index];
+async function pagarContaFixa(id) {
+  const conta = contasFixas.find(c => c.id === id);
+  if (!conta) return;
 
-  lancamentos.push({
+  const novoLancamento = {
     tipo: "despesa",
     categoria: "Conta fixa",
     descricao: conta.nome,
     valor: Number(conta.valor),
-    data: hojeTexto()
-  });
+    data: hojeTexto(),
+    user_id: usuarioAtual.id
+  };
 
   const dataAtual = new Date(conta.vencimento + "T00:00:00");
   dataAtual.setMonth(dataAtual.getMonth() + 1);
-  conta.vencimento = dataAtual.toISOString().split("T")[0];
+  const novoVencimento = dataAtual.toISOString().split("T")[0];
 
-  salvar();
+  const { error: erroLancamento } = await supabaseClient
+    .from("lancamentos")
+    .insert([novoLancamento]);
+
+  if (erroLancamento) {
+    alert("Erro ao lançar pagamento.");
+    return;
+  }
+
+  const { error: erroConta } = await supabaseClient
+    .from("contas_fixas")
+    .update({ vencimento: novoVencimento })
+    .eq("id", id)
+    .eq("user_id", usuarioAtual.id);
+
+  if (erroConta) {
+    alert("Erro ao atualizar vencimento.");
+    return;
+  }
+
+  await carregarDados();
   atualizarTela();
   atualizarContasFixas();
 
@@ -281,14 +493,14 @@ function atualizarContasFixas() {
     listaContas.innerHTML = "<p>Nenhuma conta fixa cadastrada ainda.</p>";
   }
 
-  const contasOrdenadas = contasFixas
-    .map((conta, indexOriginal) => {
+  const contasOrdenadas = [...contasFixas]
+    .map(conta => {
       let prioridade = 2;
 
       if (conta.vencimento < hoje) prioridade = 0;
       if (conta.vencimento === hoje) prioridade = 1;
 
-      return { ...conta, indexOriginal, prioridade };
+      return { ...conta, prioridade };
     })
     .sort((a, b) => {
       if (a.prioridade !== b.prioridade) return a.prioridade - b.prioridade;
@@ -325,8 +537,8 @@ function atualizarContasFixas() {
       </div>
 
       <div class="bill-actions">
-        <button type="button" onclick="pagarContaFixa(${conta.indexOriginal})">Marcar como paga</button>
-        <button type="button" class="danger" onclick="removerContaFixa(${conta.indexOriginal})">Excluir</button>
+        <button type="button" onclick="pagarContaFixa(${conta.id})">Marcar como paga</button>
+        <button type="button" class="danger" onclick="removerContaFixa(${conta.id})">Excluir</button>
       </div>
     `;
 
@@ -343,8 +555,7 @@ function atualizarDashboard() {
   let despesas = 0;
   let contasPendentes = 0;
 
-  const hoje = hojeTexto();
-  const mesAtual = hoje.slice(0, 7);
+  const mesAtual = hojeTexto().slice(0, 7);
 
   lancamentos.forEach(item => {
     if (item.data && item.data.slice(0, 7) === mesAtual) {
@@ -421,17 +632,46 @@ function atualizarMetaMensal() {
   }
 }
 
-document.getElementById("formMeta").addEventListener("submit", function(e) {
+document.getElementById("formMeta").addEventListener("submit", async function(e) {
   e.preventDefault();
 
-  metaMensal = Number(document.getElementById("valorMeta").value);
+  const novoValor = Number(document.getElementById("valorMeta").value);
 
-  if (metaMensal <= 0) {
+  if (novoValor <= 0) {
     alert("Digite uma meta maior que zero.");
     return;
   }
 
-  salvar();
+  const { data: metasExistentes } = await supabaseClient
+    .from("metas")
+    .select("*")
+    .eq("user_id", usuarioAtual.id)
+    .limit(1);
+
+  if (metasExistentes && metasExistentes.length > 0) {
+    const { error } = await supabaseClient
+      .from("metas")
+      .update({ valor: novoValor })
+      .eq("id", metasExistentes[0].id)
+      .eq("user_id", usuarioAtual.id);
+
+    if (error) {
+      alert("Erro ao atualizar meta.");
+      return;
+    }
+  } else {
+    const { error } = await supabaseClient
+      .from("metas")
+      .insert([{ valor: novoValor, user_id: usuarioAtual.id }]);
+
+    if (error) {
+      alert("Erro ao salvar meta.");
+      return;
+    }
+  }
+
+  metaMensal = novoValor;
+  await carregarDados();
   atualizarDashboard();
 });
 
@@ -472,15 +712,16 @@ function atualizarGrafico() {
   });
 }
 
-function limparTudo() {
-  if (confirm("Tem certeza que deseja apagar todos os dados?")) {
-    lancamentos = [];
-    contasFixas = [];
-    metaMensal = 0;
-    salvar();
-    atualizarTela();
-    atualizarContasFixas();
-  }
+async function limparTudo() {
+  if (!confirm("Tem certeza que deseja apagar todos os seus dados?")) return;
+
+  await supabaseClient.from("lancamentos").delete().eq("user_id", usuarioAtual.id);
+  await supabaseClient.from("contas_fixas").delete().eq("user_id", usuarioAtual.id);
+  await supabaseClient.from("metas").delete().eq("user_id", usuarioAtual.id);
+
+  await carregarDados();
+  atualizarTela();
+  atualizarContasFixas();
 }
 
 function exportarDados() {
@@ -496,56 +737,11 @@ function exportarDados() {
   URL.revokeObjectURL(url);
 }
 
-function importarDados(event) {
-  const arquivo = event.target.files[0];
-  if (!arquivo) return;
-
-  const leitor = new FileReader();
-
-  leitor.onload = function(e) {
-    try {
-      const dados = JSON.parse(e.target.result);
-
-      if (Array.isArray(dados)) {
-        lancamentos = dados;
-        contasFixas = [];
-        metaMensal = 0;
-      } else {
-        lancamentos = dados.lancamentos || [];
-        contasFixas = dados.contasFixas || [];
-        metaMensal = Number(dados.metaMensal) || 0;
-      }
-
-      salvar();
-      atualizarTela();
-      atualizarContasFixas();
-      alert("Dados importados com sucesso!");
-    } catch {
-      alert("Erro ao importar arquivo.");
-    }
-  };
-
-  leitor.readAsText(arquivo);
+async function importarDados(event) {
+  alert("Importação será adaptada para Supabase depois. Por enquanto, use o app normalmente com login.");
 }
 
-calendarioData = flatpickr("#data", {
-  dateFormat: "Y-m-d",
-  altInput: true,
-  altFormat: "d/m/Y",
-  locale: "pt",
-  defaultDate: hojeTexto()
-});
-
-calendarioVencimento = flatpickr("#dataVencimentoConta", {
-  dateFormat: "Y-m-d",
-  altInput: true,
-  altFormat: "d/m/Y",
-  locale: "pt",
-  defaultDate: hojeTexto()
-});
-
-atualizarTela();
-atualizarContasFixas();
+verificarSessao();
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("service-worker.js").then(function(registration) {
