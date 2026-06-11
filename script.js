@@ -8,10 +8,13 @@ let lancamentos = [];
 let contasFixas = [];
 let metaMensal = 0;
 let perfilAtual = null;
+let cartoesParcelados = [];
 
 let editandoId = null;
 let calendarioData;
 let calendarioVencimento;
+let editandoCartaoId = null;
+let calendarioCartaoPrimeiraParcela;
 
 const appContainer = document.querySelector(".container");
 appContainer.classList.add("hidden");
@@ -238,6 +241,7 @@ async function iniciarApp() {
 
   atualizarTela();
   atualizarContasFixas();
+  atualizarCartoes();
 
   fecharPerfil();
 }
@@ -264,12 +268,20 @@ async function carregarDados() {
   lancamentos = dadosLancamentos || [];
   contasFixas = dadosContas || [];
   metaMensal = dadosMetas && dadosMetas.length > 0 ? Number(dadosMetas[0].valor) : 0;
+
+  const { data: dadosCartoes } = await supabaseClient
+  .from("cartoes_parcelas")
+  .select("*")
+  .eq("user_id", usuarioAtual.id);
+
+cartoesParcelados = dadosCartoes || [];
 }
 
 function mostrarAba(aba) {
   document.getElementById("abaDashboard").classList.toggle("hidden", aba !== "dashboard");
   document.getElementById("abaLancamentos").classList.toggle("hidden", aba !== "lancamentos");
   document.getElementById("abaContas").classList.toggle("hidden", aba !== "contas");
+  document.getElementById("abaCartoes").classList.toggle("hidden", aba !== "cartoes");
 
   const tabs = document.querySelectorAll(".tab");
   tabs.forEach(tab => tab.classList.remove("active"));
@@ -277,6 +289,7 @@ function mostrarAba(aba) {
   if (aba === "dashboard") tabs[0].classList.add("active");
   if (aba === "lancamentos") tabs[1].classList.add("active");
   if (aba === "contas") tabs[2].classList.add("active");
+  if (aba === "cartoes") tabs[3].classList.add("active");
 }
 
 function configurarCalendarios() {
@@ -288,6 +301,17 @@ function configurarCalendarios() {
       locale: "pt",
       defaultDate: hojeTexto()
     });
+
+    if (!calendarioCartaoPrimeiraParcela) {
+  calendarioCartaoPrimeiraParcela = flatpickr("#cartaoDataPrimeiraParcela", {
+    dateFormat: "Y-m-d",
+    altInput: true,
+    altFormat: "d/m/Y",
+    locale: "pt",
+    defaultDate: hojeTexto()
+  });
+}
+
   }
 
   if (!calendarioVencimento) {
@@ -299,6 +323,7 @@ function configurarCalendarios() {
       defaultDate: hojeTexto()
     });
   }
+
 }
 
 function limparFormularioLancamento() {
@@ -998,6 +1023,252 @@ async function excluirPerfil() {
   alert("Seu perfil e dados foram excluídos deste app.");
 }
 
+const formCartao = document.getElementById("formCartao");
+
+formCartao.addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const totalParcelas = Number(document.getElementById("cartaoTotalParcelas").value);
+  const parcelasPagas = Number(document.getElementById("cartaoParcelasPagas").value);
+
+  if (parcelasPagas > totalParcelas) {
+    alert("Parcelas pagas não pode ser maior que o total de parcelas.");
+    return;
+  }
+
+  const dadosParcelamento = {
+    user_id: usuarioAtual.id,
+    cartao_nome: document.getElementById("cartaoNome").value.trim(),
+    cartao_final: document.getElementById("cartaoFinal").value.trim(),
+    descricao: document.getElementById("cartaoDescricao").value.trim(),
+    valor_total: Number(document.getElementById("cartaoValorTotal").value),
+    total_parcelas: totalParcelas,
+    parcelas_pagas: parcelasPagas,
+    data_primeira_parcela: document.getElementById("cartaoDataPrimeiraParcela").value,
+    dia_vencimento: Number(document.getElementById("cartaoDiaVencimento").value),
+    status: parcelasPagas >= totalParcelas ? "quitado" : "ativo"
+  };
+
+  let resposta;
+
+  if (editandoCartaoId) {
+    resposta = await supabaseClient
+      .from("cartoes_parcelas")
+      .update(dadosParcelamento)
+      .eq("id", editandoCartaoId)
+      .eq("user_id", usuarioAtual.id);
+  } else {
+    resposta = await supabaseClient
+      .from("cartoes_parcelas")
+      .insert([dadosParcelamento]);
+  }
+
+  if (resposta.error) {
+    alert("Erro ao salvar parcelamento.");
+    return;
+  }
+
+  await carregarDados();
+
+  atualizarCartoes();
+  atualizarDashboard();
+  limparFormularioCartao();
+
+  alert(editandoCartaoId ? "Parcelamento atualizado!" : "Compra parcelada adicionada!");
+});
+
+function atualizarCartoes() {
+  const listaCartoes = document.getElementById("listaCartoes");
+  listaCartoes.innerHTML = "";
+
+  let totalAberto = 0;
+  let parcelasPendentes = 0;
+  let comprasQuitadas = 0;
+
+  const hoje = hojeTexto();
+
+  if (!cartoesParcelados || cartoesParcelados.length === 0) {
+    listaCartoes.innerHTML = "<p>Nenhuma compra parcelada cadastrada ainda.</p>";
+  }
+
+  const ordenados = [...cartoesParcelados]
+    .map(item => {
+      const proximoVencimento = calcularProximoVencimento(item);
+      let prioridade = 2;
+
+      if (!proximoVencimento) {
+        prioridade = 3;
+      } else if (proximoVencimento < hoje) {
+        prioridade = 0;
+      } else if (proximoVencimento === hoje) {
+        prioridade = 1;
+      }
+
+      return {
+        ...item,
+        proximoVencimento,
+        prioridade
+      };
+    })
+    .sort((a, b) => {
+      if (a.prioridade !== b.prioridade) {
+        return a.prioridade - b.prioridade;
+      }
+
+      if (!a.proximoVencimento) return 1;
+      if (!b.proximoVencimento) return -1;
+
+      return new Date(a.proximoVencimento) - new Date(b.proximoVencimento);
+    });
+
+  ordenados.forEach(item => {
+    const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
+    const restantes = Number(item.total_parcelas) - Number(item.parcelas_pagas);
+    const valorRestante = valorParcela * restantes;
+    const percentualPago = (Number(item.parcelas_pagas) / Number(item.total_parcelas)) * 100;
+
+    let statusTexto = "Em andamento";
+    let statusClasse = "status-open";
+
+    if (restantes <= 0 || item.status === "quitado") {
+      comprasQuitadas += 1;
+      statusTexto = "Quitado";
+      statusClasse = "status-open";
+    } else {
+      totalAberto += valorRestante;
+      parcelasPendentes += restantes;
+
+      if (item.proximoVencimento < hoje) {
+        statusTexto = "Parcela vencida";
+        statusClasse = "status-late";
+      } else if (item.proximoVencimento === hoje) {
+        statusTexto = "Vence hoje";
+        statusClasse = "status-today";
+      } else {
+        statusTexto = "Em andamento";
+        statusClasse = "status-open";
+      }
+    }
+
+    const div = document.createElement("div");
+    div.className = "fixed-bill";
+
+    div.innerHTML = `
+      <div>
+        <strong>${item.descricao}</strong>
+        <p>
+          Cartão: ${item.cartao_nome}
+          ${item.cartao_final ? " • Final " + item.cartao_final : ""}
+        </p>
+
+        <p>
+          Próxima fatura:
+          ${item.proximoVencimento ? formatarData(item.proximoVencimento) : "Quitado"}
+        </p>
+
+        <p>
+          ${item.total_parcelas}x de ${formatarMoeda(valorParcela)}
+          • Pagas: ${item.parcelas_pagas}
+          • Restantes: ${Math.max(restantes, 0)}
+        </p>
+
+        <p>
+          Total: ${formatarMoeda(item.valor_total)}
+          • Em aberto: ${formatarMoeda(Math.max(valorRestante, 0))}
+        </p>
+
+        <div class="meta-bar">
+          <div class="meta-fill" style="width:${Math.min(percentualPago, 100)}%"></div>
+        </div>
+
+        <span class="status ${statusClasse}">
+          ${statusTexto}
+        </span>
+      </div>
+
+      <div class="bill-actions">
+        ${
+          restantes > 0
+            ? `<button type="button" onclick="pagarParcelaCartao(${item.id})">Pagar próxima parcela</button>`
+            : ""
+        }
+        <button type="button" onclick="editarParcelamento(${item.id})">Editar</button>
+        <button type="button" class="danger" onclick="excluirParcelamento(${item.id})">Excluir</button>
+      </div>
+    `;
+
+    listaCartoes.appendChild(div);
+  });
+
+  document.getElementById("totalCartoesAberto").textContent = formatarMoeda(totalAberto);
+  document.getElementById("totalParcelasPendentes").textContent = parcelasPendentes;
+  document.getElementById("totalComprasQuitadas").textContent = comprasQuitadas;
+}
+
+async function pagarParcelaCartao(id) {
+  const item = cartoesParcelados.find(p => p.id === id);
+  if (!item) return;
+
+  const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
+  const novasPagas = Number(item.parcelas_pagas) + 1;
+  const novoStatus = novasPagas >= Number(item.total_parcelas) ? "quitado" : "ativo";
+
+  const { error: erroLancamento } = await supabaseClient
+    .from("lancamentos")
+    .insert([{
+      tipo: "despesa",
+      categoria: "Cartão de crédito",
+      descricao: `${item.cartao_nome} - ${item.descricao} (${novasPagas}/${item.total_parcelas})`,
+      valor: valorParcela,
+      data: hojeTexto(),
+      user_id: usuarioAtual.id
+    }]);
+
+  if (erroLancamento) {
+    alert("Erro ao lançar parcela como despesa.");
+    return;
+  }
+
+  const { error: erroParcelamento } = await supabaseClient
+    .from("cartoes_parcelas")
+    .update({
+      parcelas_pagas: novasPagas,
+      status: novoStatus
+    })
+    .eq("id", id)
+    .eq("user_id", usuarioAtual.id);
+
+  if (erroParcelamento) {
+    alert("Erro ao atualizar parcelamento.");
+    return;
+  }
+
+  await carregarDados();
+  atualizarTela();
+  atualizarCartoes();
+
+  alert("Parcela paga e adicionada aos lançamentos!");
+}
+
+async function excluirParcelamento(id) {
+  if (!confirm("Deseja excluir este parcelamento?")) return;
+
+  const { error } = await supabaseClient
+    .from("cartoes_parcelas")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", usuarioAtual.id);
+
+  if (error) {
+    alert("Erro ao excluir parcelamento.");
+    return;
+  }
+
+  await carregarDados();
+  atualizarCartoes();
+  atualizarDashboard();
+}
+
 function mostrarCadastro() {
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("cadastroBox").classList.remove("hidden");
@@ -1006,4 +1277,74 @@ function mostrarCadastro() {
 function mostrarLogin() {
   document.getElementById("cadastroBox").classList.add("hidden");
   document.getElementById("loginBox").classList.remove("hidden");
+}
+
+function calcularProximoVencimento(item) {
+  const totalParcelas = Number(item.total_parcelas);
+  const pagas = Number(item.parcelas_pagas);
+
+  if (pagas >= totalParcelas) {
+    return null;
+  }
+
+  const dataBase = new Date(item.data_primeira_parcela + "T00:00:00");
+  dataBase.setMonth(dataBase.getMonth() + pagas);
+
+  const diaVencimento = Number(item.dia_vencimento);
+
+  const ano = dataBase.getFullYear();
+  const mes = dataBase.getMonth();
+
+  const ultimoDiaMes = new Date(ano, mes + 1, 0).getDate();
+  const diaFinal = Math.min(diaVencimento, ultimoDiaMes);
+
+  return `${ano}-${String(mes + 1).padStart(2, "0")}-${String(diaFinal).padStart(2, "0")}`;
+}
+
+function limparFormularioCartao() {
+  document.getElementById("formCartao").reset();
+
+  if (calendarioCartaoPrimeiraParcela) {
+    calendarioCartaoPrimeiraParcela.setDate(hojeTexto(), true);
+  }
+
+  editandoCartaoId = null;
+
+  document.getElementById("botaoCartao").textContent = "Adicionar compra parcelada";
+  document.getElementById("cancelarEdicaoCartao").classList.add("hidden");
+}
+
+function cancelarEdicaoCartao() {
+  limparFormularioCartao();
+}
+
+function editarParcelamento(id) {
+  const item = cartoesParcelados.find(p => p.id === id);
+  if (!item) return;
+
+  editandoCartaoId = id;
+
+  document.getElementById("cartaoNome").value = item.cartao_nome || "";
+  document.getElementById("cartaoFinal").value = item.cartao_final || "";
+  document.getElementById("cartaoDescricao").value = item.descricao || "";
+  document.getElementById("cartaoValorTotal").value = item.valor_total || "";
+  document.getElementById("cartaoTotalParcelas").value = item.total_parcelas || "";
+  document.getElementById("cartaoParcelasPagas").value = item.parcelas_pagas || 0;
+  document.getElementById("cartaoDiaVencimento").value = item.dia_vencimento || "";
+
+  if (calendarioCartaoPrimeiraParcela) {
+    calendarioCartaoPrimeiraParcela.setDate(item.data_primeira_parcela, true);
+  } else {
+    document.getElementById("cartaoDataPrimeiraParcela").value = item.data_primeira_parcela;
+  }
+
+  document.getElementById("botaoCartao").textContent = "Salvar alterações";
+  document.getElementById("cancelarEdicaoCartao").classList.remove("hidden");
+
+  mostrarAba("cartoes");
+
+  document.getElementById("formCartao").scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
 }
