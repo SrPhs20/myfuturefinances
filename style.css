@@ -685,3 +685,13 @@ span.flatpickr-weekday {
 .cartao-futuro:hover {
   opacity: 0.85;
 }
+
+.conta-futura {
+  opacity: 0.55;
+  background: #f1f5f9;
+  filter: grayscale(0.25);
+}
+
+.conta-futura:hover {
+  opacity: 0.85;
+}

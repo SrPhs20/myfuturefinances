@@ -639,7 +639,15 @@ function atualizarContasFixas() {
     }
 
     const div = document.createElement("div");
-    div.className = "fixed-bill";
+
+const mesAtual = hojeTexto().slice(0, 7);
+const contaEhDoMesAtual =
+  conta.vencimento &&
+  conta.vencimento.slice(0, 7) === mesAtual;
+
+div.className = contaEhDoMesAtual
+  ? "fixed-bill"
+  : "fixed-bill conta-futura";
 
     div.innerHTML = `
       <div>
