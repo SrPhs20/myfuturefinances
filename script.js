@@ -1017,6 +1017,18 @@ async function excluirPerfil() {
 
 const formCartao = document.getElementById("formCartao");
 
+const botaoCancelarEdicaoCartao =
+  document.getElementById("cancelarEdicaoCartao");
+
+if (botaoCancelarEdicaoCartao) {
+  botaoCancelarEdicaoCartao.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    cancelarEdicaoCartao();
+  });
+}
+
 formCartao.addEventListener("submit", async function(e) {
   e.preventDefault();
 
@@ -1060,12 +1072,18 @@ formCartao.addEventListener("submit", async function(e) {
     return;
   }
 
-  await carregarDados();
+ const estavaEditando = !!editandoCartaoId;
+
+await carregarDados();
 
 atualizarTudo();
 limparFormularioCartao();
 
-alert(editandoCartaoId ? "Parcelamento atualizado!" : "Compra parcelada adicionada!");
+alert(
+  estavaEditando
+    ? "Parcelamento atualizado!"
+    : "Compra parcelada adicionada!"
+);
 });
 
 function atualizarCartoes() {
@@ -1337,7 +1355,31 @@ function limparFormularioCartao() {
 }
 
 function cancelarEdicaoCartao() {
-  limparFormularioCartao();
+
+  editandoCartaoId = null;
+
+  document.getElementById("cartaoNome").value = "";
+  document.getElementById("cartaoFinal").value = "";
+  document.getElementById("cartaoDescricao").value = "";
+  document.getElementById("cartaoValorTotal").value = "";
+  document.getElementById("cartaoTotalParcelas").value = "";
+  document.getElementById("cartaoParcelasPagas").value = 0;
+  document.getElementById("cartaoDiaVencimento").value = "";
+
+  if (calendarioCartaoPrimeiraParcela) {
+    calendarioCartaoPrimeiraParcela.setDate(hojeTexto(), true);
+  } else {
+    document.getElementById("cartaoDataPrimeiraParcela").value = hojeTexto();
+  }
+
+  document.getElementById("botaoCartao").textContent =
+    "Adicionar compra parcelada";
+
+  document
+    .getElementById("cancelarEdicaoCartao")
+    .classList.add("hidden");
+
+  mostrarAba("cartoes");
 }
 
 function editarParcelamento(id) {
