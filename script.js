@@ -7,6 +7,7 @@ let usuarioAtual = null;
 let lancamentos = [];
 let contasFixas = [];
 let metaMensal = 0;
+let perfilAtual = null;
 
 let editandoId = null;
 let calendarioData;
@@ -20,11 +21,17 @@ document.body.insertAdjacentHTML("afterbegin", `
       <h1>Minhas Finanças</h1>
       <p>Entre na sua conta para sincronizar seus dados.</p>
 
-      <label>Email</label>
-      <input id="authEmail" type="email" placeholder="seuemail@email.com" />
+     <label>Nome</label>
+<input id="authNome" type="text" placeholder="Seu nome" />
 
-      <label>Senha</label>
-      <input id="authSenha" type="password" placeholder="Sua senha" />
+<label>Foto de perfil</label>
+<input id="authFoto" type="file" accept="image/*" />
+
+<label>Email</label>
+<input id="authEmail" type="email" placeholder="seuemail@email.com" />
+
+<label>Senha</label>
+<input id="authSenha" type="password" placeholder="Sua senha" />
 
       <button onclick="entrar()">Entrar</button>
       <button class="secondary" onclick="cadastrar()">Criar conta</button>
@@ -36,8 +43,33 @@ document.body.insertAdjacentHTML("afterbegin", `
 
 appContainer.insertAdjacentHTML("afterbegin", `
   <div class="user-bar">
-    <span id="usuarioLogado"></span>
-    <button class="secondary small-button" onclick="sair()">Sair</button>
+    <div class="profile-preview">
+      <img id="fotoPerfilTopo" class="profile-avatar hidden" />
+      <span id="usuarioLogado"></span>
+    </div>
+
+    <div class="profile-actions">
+      <button class="secondary small-button" onclick="abrirPerfil()">Editar perfil</button>
+      <button class="secondary small-button" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div id="modalPerfil" class="profile-modal hidden">
+    <div class="profile-card">
+      <h2>Meu perfil</h2>
+
+      <label>Nome</label>
+      <input id="perfilNome" type="text" placeholder="Seu nome" />
+
+      <label>Nova foto</label>
+      <input id="perfilFoto" type="file" accept="image/*" />
+
+      <img id="previewPerfil" class="profile-avatar-large hidden" />
+
+      <button onclick="salvarPerfil()">Salvar perfil</button>
+      <button class="danger" onclick="excluirPerfil()">Excluir perfil e dados</button>
+      <button class="secondary" onclick="fecharPerfil()">Fechar</button>
+    </div>
   </div>
 `);
 
@@ -70,17 +102,27 @@ function mostrarMensagemAuth(texto) {
 }
 
 async function cadastrar() {
+  const nome = document.getElementById("authNome").value.trim();
   const email = document.getElementById("authEmail").value.trim();
   const senha = document.getElementById("authSenha").value.trim();
+  const foto = document.getElementById("authFoto").files[0];
 
-  if (!email || !senha) {
-    mostrarMensagemAuth("Digite email e senha.");
+  if (!nome || !email || !senha) {
+    mostrarMensagemAuth("Digite nome, email e senha.");
     return;
   }
 
-  const { error } = await supabaseClient.auth.signUp({
+  const avatarUrl = foto ? await converterImagemParaBase64(foto) : "";
+
+  const { data, error } = await supabaseClient.auth.signUp({
     email,
-    password: senha
+    password: senha,
+    options: {
+      data: {
+        nome,
+        avatar_url: avatarUrl
+      }
+    }
   });
 
   if (error) {
@@ -88,7 +130,15 @@ async function cadastrar() {
     return;
   }
 
-  mostrarMensagemAuth("Conta criada. Verifique seu email para confirmar o cadastro.");
+  if (data.user) {
+    await supabaseClient.from("perfis").insert([{
+      user_id: data.user.id,
+      nome,
+      avatar_url: avatarUrl
+    }]);
+  }
+
+  mostrarMensagemAuth("Conta criada. Agora faça login.");
 }
 
 async function entrar() {
@@ -137,8 +187,7 @@ async function iniciarApp() {
   authScreen.classList.add("hidden");
   appContainer.classList.remove("hidden");
 
-  document.getElementById("usuarioLogado").textContent = usuarioAtual.email;
-
+  await carregarPerfil();
   await carregarDados();
   configurarCalendarios();
   atualizarTela();
@@ -747,4 +796,136 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("service-worker.js").then(function(registration) {
     registration.update();
   });
+}
+
+function converterImagemParaBase64(arquivo) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+
+    leitor.onload = function(evento) {
+      const img = new Image();
+
+      img.onload = function() {
+        const canvas = document.createElement("canvas");
+        const tamanho = 300;
+
+        canvas.width = tamanho;
+        canvas.height = tamanho;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, tamanho, tamanho);
+
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+
+      img.src = evento.target.result;
+    };
+
+    leitor.onerror = reject;
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
+async function carregarPerfil() {
+  const { data } = await supabaseClient
+    .from("perfis")
+    .select("*")
+    .eq("user_id", usuarioAtual.id)
+    .single();
+
+  perfilAtual = data;
+
+  const nome = perfilAtual?.nome || usuarioAtual.email;
+  const avatar = perfilAtual?.avatar_url || "";
+
+  document.getElementById("usuarioLogado").textContent = nome;
+
+  const fotoTopo = document.getElementById("fotoPerfilTopo");
+
+  if (avatar) {
+    fotoTopo.src = avatar;
+    fotoTopo.classList.remove("hidden");
+  } else {
+    fotoTopo.classList.add("hidden");
+  }
+}
+
+function abrirPerfil() {
+  document.getElementById("modalPerfil").classList.remove("hidden");
+
+  document.getElementById("perfilNome").value = perfilAtual?.nome || "";
+
+  const preview = document.getElementById("previewPerfil");
+
+  if (perfilAtual?.avatar_url) {
+    preview.src = perfilAtual.avatar_url;
+    preview.classList.remove("hidden");
+  } else {
+    preview.classList.add("hidden");
+  }
+}
+
+function fecharPerfil() {
+  document.getElementById("modalPerfil").classList.add("hidden");
+}
+
+async function salvarPerfil() {
+  const nome = document.getElementById("perfilNome").value.trim();
+  const foto = document.getElementById("perfilFoto").files[0];
+
+  if (!nome) {
+    alert("Digite seu nome.");
+    return;
+  }
+
+  let avatarUrl = perfilAtual?.avatar_url || "";
+
+  if (foto) {
+    avatarUrl = await converterImagemParaBase64(foto);
+  }
+
+  const dadosPerfil = {
+    user_id: usuarioAtual.id,
+    nome,
+    avatar_url: avatarUrl
+  };
+
+  if (perfilAtual) {
+    await supabaseClient
+      .from("perfis")
+      .update(dadosPerfil)
+      .eq("user_id", usuarioAtual.id);
+  } else {
+    await supabaseClient
+      .from("perfis")
+      .insert([dadosPerfil]);
+  }
+
+  await supabaseClient.auth.updateUser({
+    data: {
+      nome,
+      avatar_url: avatarUrl
+    }
+  });
+
+  await carregarPerfil();
+  fecharPerfil();
+  alert("Perfil atualizado!");
+}
+
+async function excluirPerfil() {
+  const confirmar = confirm(
+    "Tem certeza que deseja excluir seu perfil e todos os seus dados financeiros?\n\nEssa ação não poderá ser desfeita."
+  );
+
+  if (!confirmar) return;
+
+  await supabaseClient.from("lancamentos").delete().eq("user_id", usuarioAtual.id);
+  await supabaseClient.from("contas_fixas").delete().eq("user_id", usuarioAtual.id);
+  await supabaseClient.from("metas").delete().eq("user_id", usuarioAtual.id);
+  await supabaseClient.from("perfis").delete().eq("user_id", usuarioAtual.id);
+
+  await sair();
+
+  alert("Seu perfil e dados foram excluídos deste app.");
 }
