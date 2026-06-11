@@ -551,3 +551,22 @@ span.flatpickr-weekday {
   color: #64748b;
   font-weight: 700;
 }
+
+.edit-box {
+  padding: 14px;
+  border-radius: 14px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-weight: 800;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.small-button {
+  width: auto;
+  padding: 9px 12px;
+  font-size: 14px;
+  margin: 0;
+}
