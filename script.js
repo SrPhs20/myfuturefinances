@@ -124,7 +124,29 @@ const botaoLancamento = document.getElementById("botaoLancamento");
 const avisoEdicao = document.getElementById("avisoEdicao");
 
 function hojeTexto() {
-  return new Date().toISOString().split("T")[0];
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function primeiroDiaMesAtual() {
+  return `${hojeTexto().slice(0, 7)}-01`;
+}
+
+function escaparHTML(valor) {
+  return String(valor ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function mensagemErro(error, fallback) {
+  console.error(error);
+  return error?.message || fallback;
 }
 
 function formatarMoeda(valor) {
@@ -162,20 +184,15 @@ const senha = document
 
   const { data, error } = await supabaseClient.auth.signUp({
     email,
-    password: senha
+    password: senha,
+    options: {
+      data: { nome }
+    }
   });
 
   if (error) {
     mostrarMensagemAuth(error.message);
     return;
-  }
-
-  if (data.user) {
-    await supabaseClient.from("perfis").insert([{
-      user_id: data.user.id,
-      nome: nome,
-      avatar_url: ""
-    }]);
   }
 
   document.getElementById("authSenha").value = "";
@@ -213,6 +230,11 @@ async function entrar() {
 async function sair() {
   await supabaseClient.auth.signOut();
   usuarioAtual = null;
+  perfilAtual = null;
+  lancamentos = [];
+  contasFixas = [];
+  cartoesParcelados = [];
+  metaMensal = 0;
   appContainer.classList.add("hidden");
   authScreen.classList.remove("hidden");
 }
@@ -231,52 +253,55 @@ async function verificarSessao() {
 }
 
 async function iniciarApp() {
+  try {
+    authScreen.classList.add("hidden");
+    appContainer.classList.remove("hidden");
 
-  authScreen.classList.add("hidden");
+    await carregarPerfil();
+    await carregarDados();
 
-  appContainer.classList.remove("hidden");
-
-  await carregarPerfil();
-  await carregarDados();
-
-  configurarCalendarios();
-
-  atualizarTela();
-  atualizarContasFixas();
-  atualizarCartoes();
-
-  fecharPerfil();
+    configurarCalendarios();
+    atualizarTudo();
+    fecharPerfil();
+  } catch (error) {
+    appContainer.classList.add("hidden");
+    authScreen.classList.remove("hidden");
+    mostrarMensagemAuth(mensagemErro(error, "Não foi possível iniciar o aplicativo."));
+  }
 }
-
 async function carregarDados() {
-  const { data: dadosLancamentos } = await supabaseClient
-    .from("lancamentos")
-    .select("*")
-    .eq("user_id", usuarioAtual.id)
-    .order("data", { ascending: false });
+  const [resLancamentos, resContas, resMetas, resCartoes] = await Promise.all([
+    supabaseClient
+      .from("lancamentos")
+      .select("*")
+      .eq("user_id", usuarioAtual.id)
+      .order("data", { ascending: false }),
+    supabaseClient
+      .from("contas_fixas")
+      .select("*")
+      .eq("user_id", usuarioAtual.id)
+      .order("vencimento", { ascending: true }),
+    supabaseClient
+      .from("metas")
+      .select("*")
+      .eq("user_id", usuarioAtual.id)
+      .eq("mes", primeiroDiaMesAtual())
+      .maybeSingle(),
+    supabaseClient
+      .from("cartoes_parcelas")
+      .select("*")
+      .eq("user_id", usuarioAtual.id)
+  ]);
 
-  const { data: dadosContas } = await supabaseClient
-    .from("contas_fixas")
-    .select("*")
-    .eq("user_id", usuarioAtual.id)
-    .order("vencimento", { ascending: true });
+  const erro = resLancamentos.error || resContas.error || resMetas.error || resCartoes.error;
+  if (erro) {
+    throw new Error(mensagemErro(erro, "Não foi possível carregar seus dados."));
+  }
 
-  const { data: dadosMetas } = await supabaseClient
-    .from("metas")
-    .select("*")
-    .eq("user_id", usuarioAtual.id)
-    .limit(1);
-
-  lancamentos = dadosLancamentos || [];
-  contasFixas = dadosContas || [];
-  metaMensal = dadosMetas && dadosMetas.length > 0 ? Number(dadosMetas[0].valor) : 0;
-
-  const { data: dadosCartoes } = await supabaseClient
-  .from("cartoes_parcelas")
-  .select("*")
-  .eq("user_id", usuarioAtual.id);
-
-cartoesParcelados = dadosCartoes || [];
+  lancamentos = resLancamentos.data || [];
+  contasFixas = resContas.data || [];
+  metaMensal = Number(resMetas.data?.valor || 0);
+  cartoesParcelados = resCartoes.data || [];
 }
 
 function mostrarAba(aba) {
@@ -378,8 +403,8 @@ function atualizarTela() {
     tr.innerHTML = `
       <td>${formatarData(item.data)}</td>
       <td>${item.tipo === "receita" ? "Receita" : "Despesa"}</td>
-      <td>${item.categoria}</td>
-      <td>${item.descricao}</td>
+      <td>${escaparHTML(item.categoria)}</td>
+      <td>${escaparHTML(item.descricao)}</td>
       <td class="${item.tipo === "receita" ? "positive" : "negative"}">
         ${formatarMoeda(item.valor)}
       </td>
@@ -578,42 +603,17 @@ async function pagarContaFixa(id) {
   const conta = contasFixas.find(c => c.id === id);
   if (!conta) return;
 
-  const novoLancamento = {
-    tipo: "despesa",
-    categoria: "Conta fixa",
-    descricao: conta.nome,
-    valor: Number(conta.valor),
-    data: hojeTexto(),
-    user_id: usuarioAtual.id
-  };
+  const { error } = await supabaseClient.rpc("pagar_conta_fixa", {
+    p_conta_id: id
+  });
 
-  const dataAtual = new Date(conta.vencimento + "T00:00:00");
-  dataAtual.setMonth(dataAtual.getMonth() + 1);
-  const novoVencimento = dataAtual.toISOString().split("T")[0];
-
-  const { error: erroLancamento } = await supabaseClient
-    .from("lancamentos")
-    .insert([novoLancamento]);
-
-  if (erroLancamento) {
-    alert("Erro ao lançar pagamento.");
-    return;
-  }
-
-  const { error: erroConta } = await supabaseClient
-    .from("contas_fixas")
-    .update({ vencimento: novoVencimento })
-    .eq("id", id)
-    .eq("user_id", usuarioAtual.id);
-
-  if (erroConta) {
-    alert("Erro ao atualizar vencimento.");
+  if (error) {
+    alert(mensagemErro(error, "Erro ao pagar conta fixa."));
     return;
   }
 
   await carregarDados();
-  atualizarTela();
-  atualizarContasFixas();
+  atualizarTudo();
 
   alert("Conta paga! Ela foi adicionada nas despesas e voltou para o próximo mês.");
 }
@@ -678,7 +678,7 @@ div.className = contaEhDoMesAtual
 
     div.innerHTML = `
       <div>
-        <strong>${conta.nome}</strong>
+        <strong>${escaparHTML(conta.nome)}</strong>
         <p>${formatarMoeda(conta.valor)} • Vencimento: ${formatarData(conta.vencimento)}</p>
         <span class="status ${classeStatus}">${status}</span>
       </div>
@@ -713,8 +713,10 @@ function atualizarDashboard() {
   });
 
   contasFixas.forEach(conta => {
-  contasPendentes += Number(conta.valor);
-});
+    if (conta.vencimento && conta.vencimento.slice(0, 7) <= mesAtual) {
+      contasPendentes += Number(conta.valor);
+    }
+  });
 
 contasPendentes += parcelasCartaoDoMesAtual();
 
@@ -792,32 +794,17 @@ document.getElementById("formMeta").addEventListener("submit", async function(e)
     return;
   }
 
-  const { data: metasExistentes } = await supabaseClient
+  const { error } = await supabaseClient
     .from("metas")
-    .select("*")
-    .eq("user_id", usuarioAtual.id)
-    .limit(1);
+    .upsert([{
+      valor: novoValor,
+      user_id: usuarioAtual.id,
+      mes: primeiroDiaMesAtual()
+    }], { onConflict: "user_id,mes" });
 
-  if (metasExistentes && metasExistentes.length > 0) {
-    const { error } = await supabaseClient
-      .from("metas")
-      .update({ valor: novoValor })
-      .eq("id", metasExistentes[0].id)
-      .eq("user_id", usuarioAtual.id);
-
-    if (error) {
-      alert("Erro ao atualizar meta.");
-      return;
-    }
-  } else {
-    const { error } = await supabaseClient
-      .from("metas")
-      .insert([{ valor: novoValor, user_id: usuarioAtual.id }]);
-
-    if (error) {
-      alert("Erro ao salvar meta.");
-      return;
-    }
+  if (error) {
+    alert(mensagemErro(error, "Erro ao salvar meta."));
+    return;
   }
 
   metaMensal = novoValor;
@@ -852,7 +839,7 @@ function atualizarGrafico() {
 
     div.innerHTML = `
       <div class="bar-label">
-        <span>${categoria}</span>
+        <span>${escaparHTML(categoria)}</span>
         <span>${formatarMoeda(valor)}</span>
       </div>
       <div class="bar-fill" style="width:${largura}%"></div>
@@ -865,17 +852,25 @@ function atualizarGrafico() {
 async function limparTudo() {
   if (!confirm("Tem certeza que deseja apagar todos os seus dados?")) return;
 
-  await supabaseClient.from("lancamentos").delete().eq("user_id", usuarioAtual.id);
-  await supabaseClient.from("contas_fixas").delete().eq("user_id", usuarioAtual.id);
-  await supabaseClient.from("metas").delete().eq("user_id", usuarioAtual.id);
+  const { error } = await supabaseClient.rpc("limpar_meus_dados");
+  if (error) {
+    alert(mensagemErro(error, "Não foi possível apagar os dados."));
+    return;
+  }
 
   await carregarDados();
-  atualizarTela();
-  atualizarContasFixas();
+  atualizarTudo();
 }
 
 function exportarDados() {
-  const dados = JSON.stringify({ lancamentos, contasFixas, metaMensal }, null, 2);
+  const dados = JSON.stringify({
+    versao: 2,
+    exportadoEm: new Date().toISOString(),
+    lancamentos,
+    contasFixas,
+    metaMensal,
+    cartoesParcelados
+  }, null, 2);
   const blob = new Blob([dados], { type: "application/json" });
   const url = URL.createObjectURL(blob);
 
@@ -888,7 +883,71 @@ function exportarDados() {
 }
 
 async function importarDados(event) {
-  alert("Importação será adaptada para Supabase depois. Por enquanto, use o app normalmente com login.");
+  const arquivo = event.target.files?.[0];
+  event.target.value = "";
+  if (!arquivo) return;
+
+  try {
+    const dados = JSON.parse(await arquivo.text());
+    if (!Array.isArray(dados.lancamentos) || !Array.isArray(dados.contasFixas)) {
+      throw new Error("O arquivo não possui um formato de backup válido.");
+    }
+
+    if (!confirm("Os dados do arquivo serão adicionados à sua conta. Deseja continuar?")) return;
+
+    const novosLancamentos = dados.lancamentos.map(({ tipo, categoria, descricao, valor, data, origem, origem_id }) => ({
+      tipo,
+      categoria,
+      descricao,
+      valor: Number(valor),
+      data,
+      origem: origem || null,
+      origem_id: origem_id || null,
+      user_id: usuarioAtual.id
+    }));
+
+    const novasContas = dados.contasFixas.map(({ nome, valor, vencimento }) => ({
+      nome,
+      valor: Number(valor),
+      vencimento,
+      user_id: usuarioAtual.id
+    }));
+
+    const novosCartoes = (dados.cartoesParcelados || []).map(item => ({
+      cartao_nome: item.cartao_nome,
+      cartao_final: item.cartao_final || "",
+      descricao: item.descricao,
+      valor_total: Number(item.valor_total),
+      total_parcelas: Number(item.total_parcelas),
+      parcelas_pagas: Number(item.parcelas_pagas || 0),
+      data_primeira_parcela: item.data_primeira_parcela,
+      dia_vencimento: Number(item.dia_vencimento),
+      status: item.status === "quitado" ? "quitado" : "ativo",
+      user_id: usuarioAtual.id
+    }));
+
+    const operacoes = [];
+    if (novosLancamentos.length) operacoes.push(supabaseClient.from("lancamentos").insert(novosLancamentos));
+    if (novasContas.length) operacoes.push(supabaseClient.from("contas_fixas").insert(novasContas));
+    if (novosCartoes.length) operacoes.push(supabaseClient.from("cartoes_parcelas").insert(novosCartoes));
+    if (Number(dados.metaMensal) > 0) {
+      operacoes.push(supabaseClient.from("metas").upsert([{
+        user_id: usuarioAtual.id,
+        mes: primeiroDiaMesAtual(),
+        valor: Number(dados.metaMensal)
+      }], { onConflict: "user_id,mes" }));
+    }
+
+    const resultados = await Promise.all(operacoes);
+    const erro = resultados.find(resultado => resultado.error)?.error;
+    if (erro) throw erro;
+
+    await carregarDados();
+    atualizarTudo();
+    alert("Backup importado com sucesso.");
+  } catch (error) {
+    alert(mensagemErro(error, "Não foi possível importar o arquivo."));
+  }
 }
 
 verificarSessao();
@@ -899,7 +958,7 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-function converterImagemParaBase64(arquivo) {
+function prepararImagemPerfil(arquivo) {
   return new Promise((resolve, reject) => {
     const leitor = new FileReader();
 
@@ -916,7 +975,10 @@ function converterImagemParaBase64(arquivo) {
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, tamanho, tamanho);
 
-        resolve(canvas.toDataURL("image/jpeg", 0.75));
+        canvas.toBlob(blob => {
+          if (blob) resolve(blob);
+          else reject(new Error("Não foi possível preparar a imagem."));
+        }, "image/jpeg", 0.82);
       };
 
       img.src = evento.target.result;
@@ -928,13 +990,26 @@ function converterImagemParaBase64(arquivo) {
 }
 
 async function carregarPerfil() {
-  const { data } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from("perfis")
     .select("*")
     .eq("user_id", usuarioAtual.id)
-    .single();
+    .maybeSingle();
 
-  perfilAtual = data;
+  if (error) throw error;
+
+  if (!data) {
+    const nomeInicial = usuarioAtual.user_metadata?.nome || usuarioAtual.email?.split("@")[0] || "Usuário";
+    const { data: perfilCriado, error: erroCriacao } = await supabaseClient
+      .from("perfis")
+      .insert([{ user_id: usuarioAtual.id, nome: nomeInicial, avatar_url: "" }])
+      .select()
+      .single();
+    if (erroCriacao) throw erroCriacao;
+    perfilAtual = perfilCriado;
+  } else {
+    perfilAtual = data;
+  }
 
   const nome = perfilAtual?.nome || usuarioAtual.email;
   const avatar = perfilAtual?.avatar_url || "";
@@ -980,11 +1055,29 @@ async function salvarPerfil() {
   }
 
   let avatarUrl = perfilAtual?.avatar_url || "";
-
   const foto = document.getElementById("perfilFoto").files[0];
 
   if (foto) {
-    avatarUrl = await converterImagemParaBase64(foto);
+    if (!foto.type.startsWith("image/")) {
+      alert("Selecione um arquivo de imagem.");
+      return;
+    }
+
+    const imagem = await prepararImagemPerfil(foto);
+    const caminho = `${usuarioAtual.id}/avatar.jpg`;
+    const { error: uploadError } = await supabaseClient.storage
+      .from("avatars")
+      .upload(caminho, imagem, { contentType: "image/jpeg", upsert: true });
+
+    if (uploadError) {
+      alert(mensagemErro(uploadError, "Não foi possível enviar a foto."));
+      return;
+    }
+
+    const { data: publicUrlData } = supabaseClient.storage
+      .from("avatars")
+      .getPublicUrl(caminho);
+    avatarUrl = `${publicUrlData.publicUrl}?v=${Date.now()}`;
   }
 
   const dados = {
@@ -1041,14 +1134,21 @@ async function excluirPerfil() {
 
   if (!confirmar) return;
 
-  await supabaseClient.from("lancamentos").delete().eq("user_id", usuarioAtual.id);
-  await supabaseClient.from("contas_fixas").delete().eq("user_id", usuarioAtual.id);
-  await supabaseClient.from("metas").delete().eq("user_id", usuarioAtual.id);
-  await supabaseClient.from("perfis").delete().eq("user_id", usuarioAtual.id);
+  const { error } = await supabaseClient.functions.invoke("delete-account", {
+    body: { confirmar: true }
+  });
 
-  await sair();
+  if (error) {
+    alert(mensagemErro(error, "Não foi possível excluir sua conta."));
+    return;
+  }
 
-  alert("Seu perfil e dados foram excluídos deste app.");
+  await supabaseClient.auth.signOut({ scope: "local" });
+  usuarioAtual = null;
+  appContainer.classList.add("hidden");
+  authScreen.classList.remove("hidden");
+
+  alert("Sua conta e seus dados foram excluídos.");
 }
 
 const formCartao = document.getElementById("formCartao");
@@ -1207,10 +1307,10 @@ div.className = parcelaEhDoMesAtual || restantes <= 0
 
     div.innerHTML = `
       <div>
-        <strong>${item.descricao}</strong>
+        <strong>${escaparHTML(item.descricao)}</strong>
         <p>
-          Cartão: ${item.cartao_nome}
-          ${item.cartao_final ? " • Final " + item.cartao_final : ""}
+          Cartão: ${escaparHTML(item.cartao_nome)}
+          ${item.cartao_final ? " • Final " + escaparHTML(item.cartao_final) : ""}
         </p>
 
       <p>
@@ -1269,39 +1369,12 @@ async function pagarParcelaCartao(id) {
   const item = cartoesParcelados.find(p => p.id === id);
   if (!item) return;
 
-  const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
-  const novasPagas = Number(item.parcelas_pagas) + 1;
-  const novoStatus = novasPagas >= Number(item.total_parcelas) ? "quitado" : "ativo";
+  const { error } = await supabaseClient.rpc("pagar_parcela_cartao", {
+    p_parcelamento_id: id
+  });
 
-  const { error: erroLancamento } = await supabaseClient
-    .from("lancamentos")
-    .insert([{
-      tipo: "despesa",
-      categoria: "Cartão de crédito",
-      descricao: `${item.cartao_nome} - ${item.descricao} (${novasPagas}/${item.total_parcelas})`,
-      valor: valorParcela,
-      data: hojeTexto(),
-      user_id: usuarioAtual.id,
-      origem: "cartao",
-      origem_id: item.id
-    }]);
-
-  if (erroLancamento) {
-    alert("Erro ao lançar parcela como despesa.");
-    return;
-  }
-
-  const { error: erroParcelamento } = await supabaseClient
-    .from("cartoes_parcelas")
-    .update({
-      parcelas_pagas: novasPagas,
-      status: novoStatus
-    })
-    .eq("id", id)
-    .eq("user_id", usuarioAtual.id);
-
-  if (erroParcelamento) {
-    alert("Erro ao atualizar parcelamento.");
+  if (error) {
+    alert(mensagemErro(error, "Erro ao pagar parcela."));
     return;
   }
 
@@ -1318,26 +1391,12 @@ async function excluirParcelamento(id) {
 
   if (!confirmar) return;
 
-  const { error: erroLancamentos } = await supabaseClient
-    .from("lancamentos")
-    .delete()
-    .eq("user_id", usuarioAtual.id)
-    .eq("origem", "cartao")
-    .eq("origem_id", id);
-
-  if (erroLancamentos) {
-    alert("Erro ao excluir lançamentos vinculados ao cartão.");
-    return;
-  }
-
-  const { error } = await supabaseClient
-    .from("cartoes_parcelas")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", usuarioAtual.id);
+  const { error } = await supabaseClient.rpc("excluir_parcelamento_cartao", {
+    p_parcelamento_id: id
+  });
 
   if (error) {
-    alert("Erro ao excluir parcelamento.");
+    alert(mensagemErro(error, "Erro ao excluir parcelamento."));
     return;
   }
 
@@ -1363,13 +1422,11 @@ function calcularProximoVencimento(item) {
     return null;
   }
 
-  const dataBase = new Date(item.data_primeira_parcela + "T00:00:00");
-  dataBase.setMonth(dataBase.getMonth() + pagas);
-
   const diaVencimento = Number(item.dia_vencimento);
-
-  const ano = dataBase.getFullYear();
-  const mes = dataBase.getMonth();
+  const [anoBase, mesBase] = item.data_primeira_parcela.split("-").map(Number);
+  const indiceMes = anoBase * 12 + (mesBase - 1) + pagas;
+  const ano = Math.floor(indiceMes / 12);
+  const mes = indiceMes % 12;
 
   const ultimoDiaMes = new Date(ano, mes + 1, 0).getDate();
   const diaFinal = Math.min(diaVencimento, ultimoDiaMes);
