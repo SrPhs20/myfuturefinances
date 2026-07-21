@@ -7,8 +7,12 @@ let usuarioAtual = null;
 let lancamentos = [];
 let contasFixas = [];
 let metaMensal = 0;
+let metasMensais = [];
 let perfilAtual = null;
 let cartoesParcelados = [];
+let orcamentos = [];
+let objetivosFinanceiros = [];
+let mesDashboard = null;
 
 let editandoId = null;
 let calendarioData;
@@ -16,6 +20,8 @@ let calendarioVencimento;
 let editandoCartaoId = null;
 let calendarioCartaoPrimeiraParcela;
 let editandoContaFixaId = null;
+let editandoOrcamentoId = null;
+let editandoObjetivoId = null;
 
 const appContainer = document.querySelector(".container");
 appContainer.classList.add("hidden");
@@ -270,7 +276,7 @@ async function iniciarApp() {
   }
 }
 async function carregarDados() {
-  const [resLancamentos, resContas, resMetas, resCartoes] = await Promise.all([
+  const [resLancamentos, resContas, resMetas, resCartoes, resOrcamentos, resObjetivos] = await Promise.all([
     supabaseClient
       .from("lancamentos")
       .select("*")
@@ -284,24 +290,35 @@ async function carregarDados() {
     supabaseClient
       .from("metas")
       .select("*")
-      .eq("user_id", usuarioAtual.id)
-      .eq("mes", primeiroDiaMesAtual())
-      .maybeSingle(),
+      .eq("user_id", usuarioAtual.id),
     supabaseClient
       .from("cartoes_parcelas")
       .select("*")
+      .eq("user_id", usuarioAtual.id),
+    supabaseClient
+      .from("orcamentos")
+      .select("*")
+      .eq("user_id", usuarioAtual.id),
+    supabaseClient
+      .from("objetivos_financeiros")
+      .select("*")
       .eq("user_id", usuarioAtual.id)
+      .order("created_at", { ascending: false })
   ]);
 
-  const erro = resLancamentos.error || resContas.error || resMetas.error || resCartoes.error;
+  const erro = resLancamentos.error || resContas.error || resMetas.error || resCartoes.error || resOrcamentos.error || resObjetivos.error;
   if (erro) {
     throw new Error(mensagemErro(erro, "Não foi possível carregar seus dados."));
   }
 
   lancamentos = resLancamentos.data || [];
   contasFixas = resContas.data || [];
-  metaMensal = Number(resMetas.data?.valor || 0);
+  metasMensais = resMetas.data || [];
+  metaMensal = Number(metasMensais.find(meta => meta.mes === primeiroDiaMesAtual())?.valor || 0);
   cartoesParcelados = resCartoes.data || [];
+  orcamentos = resOrcamentos.data || [];
+  objetivosFinanceiros = resObjetivos.data || [];
+  if (!mesDashboard) mesDashboard = hojeTexto().slice(0, 7);
 }
 
 function mostrarAba(aba) {
@@ -309,6 +326,7 @@ function mostrarAba(aba) {
   document.getElementById("abaLancamentos").classList.toggle("hidden", aba !== "lancamentos");
   document.getElementById("abaContas").classList.toggle("hidden", aba !== "contas");
   document.getElementById("abaCartoes").classList.toggle("hidden", aba !== "cartoes");
+  document.getElementById("abaPlanejamento").classList.toggle("hidden", aba !== "planejamento");
 
   const tabs = document.querySelectorAll(".tab");
   tabs.forEach(tab => tab.classList.remove("active"));
@@ -317,6 +335,7 @@ function mostrarAba(aba) {
   if (aba === "lancamentos") tabs[1].classList.add("active");
   if (aba === "contas") tabs[2].classList.add("active");
   if (aba === "cartoes") tabs[3].classList.add("active");
+  if (aba === "planejamento") tabs[4].classList.add("active");
 }
 
 function configurarCalendarios() {
@@ -698,54 +717,97 @@ div.className = contaEhDoMesAtual
   document.getElementById("totalFixasVencidas").textContent = formatarMoeda(totalVencidas);
 }
 
+function resumoDoMes(mes) {
+  return lancamentos.reduce((resumo, item) => {
+    if (item.data?.slice(0, 7) === mes) resumo[item.tipo] += Number(item.valor);
+    return resumo;
+  }, { receita: 0, despesa: 0 });
+}
+
+function mesAnterior(mes) {
+  const [ano, numeroMes] = mes.split("-").map(Number);
+  const data = new Date(ano, numeroMes - 2, 1);
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function nomeDoMes(mes) {
+  const [ano, numeroMes] = mes.split("-").map(Number);
+  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(ano, numeroMes - 1, 1));
+}
+
+function alterarMesDashboard(novoMes) {
+  if (!/^\d{4}-\d{2}$/.test(novoMes)) return;
+  mesDashboard = novoMes;
+  atualizarDashboard();
+  atualizarPlanejamento();
+}
+
+function voltarMesAtual() {
+  alterarMesDashboard(hojeTexto().slice(0, 7));
+}
+
+function calcularSaudeFinanceira({ receitas, despesas, saldoPrevisto, contasPendentes, orcamentosMes }) {
+  if (!receitas && !despesas) return 0;
+  let score = 45;
+  const taxa = receitas > 0 ? (receitas - despesas) / receitas : -1;
+  if (taxa >= 0.2) score += 25;
+  else if (taxa >= 0.1) score += 17;
+  else if (taxa >= 0) score += 7;
+  else score -= 22;
+  score += saldoPrevisto >= 0 ? 15 : -20;
+  const pressao = receitas > 0 ? contasPendentes / receitas : 1;
+  if (pressao <= 0.3) score += 10;
+  else if (pressao > 0.6) score -= 10;
+  if (orcamentosMes.length) {
+    const dentro = orcamentosMes.filter(o => gastoCategoria(o.categoria, mesDashboard) <= Number(o.limite)).length;
+    score += Math.round((dentro / orcamentosMes.length) * 10);
+  }
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
 function atualizarDashboard() {
-  let receitas = 0;
-  let despesas = 0;
-  let contasPendentes = 0;
-
-  const mesAtual = hojeTexto().slice(0, 7);
-
-  lancamentos.forEach(item => {
-    if (item.data && item.data.slice(0, 7) === mesAtual) {
-      if (item.tipo === "receita") receitas += Number(item.valor);
-      if (item.tipo === "despesa") despesas += Number(item.valor);
-    }
-  });
-
-  contasFixas.forEach(conta => {
-    if (conta.vencimento && conta.vencimento.slice(0, 7) <= mesAtual) {
-      contasPendentes += Number(conta.valor);
-    }
-  });
-
-contasPendentes += parcelasCartaoDoMesAtual();
+  if (!mesDashboard) mesDashboard = hojeTexto().slice(0, 7);
+  const { receita: receitas, despesa: despesas } = resumoDoMes(mesDashboard);
+  let contasPendentes = contasFixas
+    .filter(conta => conta.vencimento?.slice(0, 7) <= mesDashboard)
+    .reduce((total, conta) => total + Number(conta.valor), 0);
+  contasPendentes += parcelasCartaoDoMes(mesDashboard);
 
   const saldoAtual = receitas - despesas;
   const saldoPrevisto = saldoAtual - contasPendentes;
-  const economiaMes = receitas - despesas;
+  const taxaEconomia = receitas > 0 ? (saldoAtual / receitas) * 100 : 0;
+  const orcamentosMes = orcamentos.filter(item => item.mes?.slice(0, 7) === mesDashboard);
+  const score = calcularSaudeFinanceira({ receitas, despesas, saldoPrevisto, contasPendentes, orcamentosMes });
 
+  document.getElementById("mesDashboard").value = mesDashboard;
+  document.getElementById("tituloMesDashboard").textContent = nomeDoMes(mesDashboard).replace(/^./, letra => letra.toUpperCase());
   document.getElementById("dashSaldoAtual").textContent = formatarMoeda(saldoAtual);
   document.getElementById("dashContasPendentes").textContent = formatarMoeda(contasPendentes);
   document.getElementById("dashSaldoPrevisto").textContent = formatarMoeda(saldoPrevisto);
-  document.getElementById("dashEconomiaMes").textContent = formatarMoeda(economiaMes);
+  document.getElementById("dashEconomiaMes").textContent = `${Math.round(taxaEconomia)}%`;
+  document.getElementById("scoreFinanceiro").textContent = score;
+  document.getElementById("scoreRing").style.setProperty("--score", `${score * 3.6}deg`);
+
+  const nivel = score >= 80 ? ["Excelente direção", "Sua estrutura financeira está forte. Mantenha os limites e dê destino ao excedente."]
+    : score >= 60 ? ["No caminho certo", "Há uma boa base. Ajustes pequenos podem aumentar sua folga e acelerar seus objetivos."]
+    : score >= 40 ? ["Mês de atenção", "Priorize o saldo previsto, corte excessos nas maiores categorias e evite novos compromissos."]
+    : score > 0 ? ["Hora de reorganizar", "Seu plano precisa de proteção. Comece pelas despesas essenciais e renegocie o que pressiona o caixa."]
+    : ["Comece a registrar", "O placar aparece assim que existirem receitas ou despesas no mês selecionado."];
+  document.getElementById("tituloScore").textContent = nivel[0];
+  document.getElementById("textoScore").textContent = nivel[1];
 
   const alerta = document.getElementById("alertaFinanceiro");
-
-  if (receitas === 0 && despesas === 0) {
-    alerta.className = "alert-box alert-neutral";
-    alerta.innerHTML = "Adicione seus lançamentos para gerar uma análise financeira.";
-  } else if (saldoPrevisto < 0) {
-    alerta.className = "alert-box alert-danger";
-    alerta.innerHTML = "Atenção: considerando suas contas pendentes, seu saldo previsto está negativo.";
-  } else if (despesas > receitas * 0.8) {
-    alerta.className = "alert-box alert-warning";
-    alerta.innerHTML = "Cuidado: suas despesas já estão consumindo grande parte das receitas do mês.";
-  } else {
-    alerta.className = "alert-box alert-success";
-    alerta.innerHTML = "Boa! Seu saldo previsto está positivo considerando suas contas pendentes.";
-  }
+  alerta.className = `alert-box ${saldoPrevisto < 0 ? "alert-danger" : taxaEconomia < 10 ? "alert-warning" : receitas ? "alert-success" : "alert-neutral"}`;
+  alerta.textContent = saldoPrevisto < 0
+    ? `Plano de proteção: faltam ${formatarMoeda(Math.abs(saldoPrevisto))} para cobrir os compromissos previstos.`
+    : receitas ? `Sua folga prevista é ${formatarMoeda(saldoPrevisto)}. Direcione parte dela para uma meta antes que vire gasto sem intenção.`
+      : "Adicione os lançamentos deste mês para receber uma análise personalizada.";
 
   atualizarMetaMensal();
+  atualizarGraficoTendencia();
+  atualizarInsights({ receitas, despesas, saldoPrevisto, taxaEconomia, orcamentosMes });
+  atualizarCompromissos();
+  atualizarReserva();
 }
 
 function atualizarMetaMensal() {
@@ -756,31 +818,21 @@ function atualizarMetaMensal() {
 
   if (!valorMetaInput || !barraMeta || !porcentagemMeta || !textoMeta) return;
 
-  valorMetaInput.value = metaMensal > 0 ? metaMensal : "";
-
-  let receitas = 0;
-  let despesas = 0;
-  const mesAtual = hojeTexto().slice(0, 7);
-
-  lancamentos.forEach(item => {
-    if (item.data && item.data.slice(0, 7) === mesAtual) {
-      if (item.tipo === "receita") receitas += Number(item.valor);
-      if (item.tipo === "despesa") despesas += Number(item.valor);
-    }
-  });
-
-  const economia = receitas - despesas;
-  const progresso = metaMensal > 0 ? Math.min((economia / metaMensal) * 100, 100) : 0;
+  const metaSelecionada = Number(metasMensais.find(meta => meta.mes?.slice(0, 7) === mesDashboard)?.valor || 0);
+  valorMetaInput.value = metaSelecionada > 0 ? metaSelecionada : "";
+  const resumo = resumoDoMes(mesDashboard);
+  const economia = resumo.receita - resumo.despesa;
+  const progresso = metaSelecionada > 0 ? Math.min((economia / metaSelecionada) * 100, 100) : 0;
 
   barraMeta.style.width = `${Math.max(progresso, 0)}%`;
   porcentagemMeta.textContent = `${Math.round(Math.max(progresso, 0))}%`;
 
-  if (metaMensal <= 0) {
+  if (metaSelecionada <= 0) {
     textoMeta.textContent = "Defina uma meta mensal para acompanhar seu progresso.";
-  } else if (economia >= metaMensal) {
+  } else if (economia >= metaSelecionada) {
     textoMeta.textContent = "Parabéns! Você atingiu sua meta mensal.";
   } else {
-    textoMeta.textContent = `Faltam ${formatarMoeda(metaMensal - economia)} para atingir sua meta.`;
+    textoMeta.textContent = `Faltam ${formatarMoeda(metaSelecionada - economia)} para atingir sua meta.`;
   }
 }
 
@@ -799,7 +851,7 @@ document.getElementById("formMeta").addEventListener("submit", async function(e)
     .upsert([{
       valor: novoValor,
       user_id: usuarioAtual.id,
-      mes: primeiroDiaMesAtual()
+      mes: `${mesDashboard}-01`
     }], { onConflict: "user_id,mes" });
 
   if (error) {
@@ -807,10 +859,82 @@ document.getElementById("formMeta").addEventListener("submit", async function(e)
     return;
   }
 
-  metaMensal = novoValor;
   await carregarDados();
   atualizarDashboard();
 });
+
+function gastoCategoria(categoria, mes) {
+  const chave = String(categoria).trim().toLocaleLowerCase("pt-BR");
+  return lancamentos
+    .filter(item => item.tipo === "despesa" && item.data?.slice(0, 7) === mes && String(item.categoria).trim().toLocaleLowerCase("pt-BR") === chave)
+    .reduce((total, item) => total + Number(item.valor), 0);
+}
+
+function atualizarGraficoTendencia() {
+  const grafico = document.getElementById("graficoTendencia");
+  const meses = [];
+  let cursor = mesDashboard;
+  for (let i = 0; i < 6; i += 1) { meses.unshift(cursor); cursor = mesAnterior(cursor); }
+  const dados = meses.map(mes => ({ mes, ...resumoDoMes(mes) }));
+  const maior = Math.max(1, ...dados.flatMap(item => [item.receita, item.despesa]));
+  grafico.innerHTML = dados.map(item => `
+    <div class="trend-column" title="${nomeDoMes(item.mes)}">
+      <div class="trend-bars">
+        <span class="trend-income" style="height:${Math.max(item.receita ? 5 : 0, item.receita / maior * 100)}%"></span>
+        <span class="trend-expense" style="height:${Math.max(item.despesa ? 5 : 0, item.despesa / maior * 100)}%"></span>
+      </div>
+      <small>${nomeDoMes(item.mes).split(" ")[0].slice(0, 3)}</small>
+    </div>`).join("");
+}
+
+function atualizarInsights({ receitas, despesas, saldoPrevisto, taxaEconomia, orcamentosMes }) {
+  const lista = document.getElementById("listaInsights");
+  const anterior = resumoDoMes(mesAnterior(mesDashboard));
+  const variacao = anterior.despesa > 0 ? ((despesas - anterior.despesa) / anterior.despesa) * 100 : null;
+  const categorias = {};
+  lancamentos.filter(item => item.tipo === "despesa" && item.data?.slice(0, 7) === mesDashboard)
+    .forEach(item => { categorias[item.categoria] = (categorias[item.categoria] || 0) + Number(item.valor); });
+  const maiorCategoria = Object.entries(categorias).sort((a, b) => b[1] - a[1])[0];
+  const estourados = orcamentosMes.filter(item => gastoCategoria(item.categoria, mesDashboard) > Number(item.limite));
+  const insights = [];
+
+  if (receitas > 0) insights.push({ icon: taxaEconomia >= 20 ? "↗" : "◎", title: `Você preservou ${Math.round(taxaEconomia)}% da renda`, text: taxaEconomia >= 20 ? "Faixa saudável: automatize uma parte para seus objetivos." : "Tente chegar gradualmente a 20%, começando por 5% automáticos." });
+  if (maiorCategoria) insights.push({ icon: "◫", title: `${maiorCategoria[0]} lidera os gastos`, text: `${formatarMoeda(maiorCategoria[1])} no mês. É a categoria com maior potencial de ajuste.` });
+  if (variacao !== null) insights.push({ icon: variacao <= 0 ? "↓" : "↑", title: `Despesas ${variacao <= 0 ? "caíram" : "subiram"} ${Math.abs(Math.round(variacao))}%`, text: `Comparação com ${nomeDoMes(mesAnterior(mesDashboard))}.` });
+  if (estourados.length) insights.push({ icon: "!", title: `${estourados.length} orçamento(s) acima do limite`, text: `Revise ${estourados.map(item => item.categoria).join(", ")}.` });
+  if (saldoPrevisto < 0) insights.unshift({ icon: "!", title: "Compromissos superam sua folga", text: `Reduza ou adie ${formatarMoeda(Math.abs(saldoPrevisto))} para fechar o mês no azul.` });
+  if (!insights.length) insights.push({ icon: "+", title: "Alimente seu histórico", text: "Registre receitas, despesas e orçamentos para receber recomendações úteis." });
+
+  lista.innerHTML = insights.slice(0, 4).map(item => `<div class="insight-item"><span>${item.icon}</span><div><strong>${escaparHTML(item.title)}</strong><p>${escaparHTML(item.text)}</p></div></div>`).join("");
+}
+
+function atualizarCompromissos() {
+  const container = document.getElementById("proximosCompromissos");
+  const compromissos = contasFixas.map(conta => ({ nome: conta.nome, data: conta.vencimento, valor: Number(conta.valor), tipo: "Conta fixa" }));
+  cartoesParcelados.forEach(item => {
+    const data = calcularProximoVencimento(item);
+    if (data) compromissos.push({ nome: `${item.cartao_nome} · ${item.descricao}`, data, valor: Number(item.valor_total) / Number(item.total_parcelas), tipo: "Parcela" });
+  });
+  compromissos.sort((a, b) => a.data.localeCompare(b.data));
+  container.innerHTML = compromissos.length ? compromissos.slice(0, 6).map(item => `
+    <div class="commitment-item"><div class="commitment-date"><strong>${item.data.slice(8, 10)}</strong><span>${nomeDoMes(item.data.slice(0, 7)).split(" ")[0].slice(0, 3)}</span></div><div><strong>${escaparHTML(item.nome)}</strong><p>${item.tipo} · ${formatarData(item.data)}</p></div><strong>${formatarMoeda(item.valor)}</strong></div>`).join("")
+    : '<p class="empty-state">Nenhum compromisso futuro cadastrado.</p>';
+}
+
+function atualizarReserva() {
+  const objetivo = objetivosFinanceiros.find(item => item.tipo === "reserva_emergencia" && item.status !== "pausado");
+  const custoEssencial = contasFixas.reduce((total, conta) => total + Number(conta.valor), 0);
+  const recomendado = custoEssencial * 6;
+  const alvo = Number(objetivo?.valor_alvo || recomendado || 0);
+  const atual = Number(objetivo?.valor_atual || 0);
+  const percentual = alvo > 0 ? Math.min(100, atual / alvo * 100) : 0;
+  document.getElementById("reservaAtual").textContent = `${formatarMoeda(atual)} guardados`;
+  document.getElementById("reservaPercentual").textContent = `${Math.round(percentual)}%`;
+  document.getElementById("barraReserva").style.width = `${percentual}%`;
+  document.getElementById("textoReserva").textContent = objetivo
+    ? `Alvo de ${formatarMoeda(alvo)}. ${atual >= alvo ? "Sua proteção está completa." : `Faltam ${formatarMoeda(alvo - atual)}.`}`
+    : recomendado > 0 ? `Sugestão: acumule ${formatarMoeda(recomendado)}, equivalente a 6 meses de contas fixas.` : "Cadastre suas contas e crie uma meta de reserva no Planejamento.";
+}
 
 function atualizarGrafico() {
   const grafico = document.getElementById("grafico");
@@ -864,11 +988,14 @@ async function limparTudo() {
 
 function exportarDados() {
   const dados = JSON.stringify({
-    versao: 2,
+    versao: 3,
     exportadoEm: new Date().toISOString(),
     lancamentos,
     contasFixas,
     metaMensal,
+    metasMensais,
+    orcamentos,
+    objetivosFinanceiros,
     cartoesParcelados
   }, null, 2);
   const blob = new Blob([dados], { type: "application/json" });
@@ -926,11 +1053,33 @@ async function importarDados(event) {
       user_id: usuarioAtual.id
     }));
 
+    const novosOrcamentos = (dados.orcamentos || []).map(item => ({
+      user_id: usuarioAtual.id,
+      mes: item.mes,
+      categoria: item.categoria,
+      limite: Number(item.limite)
+    }));
+
+    const novosObjetivos = (dados.objetivosFinanceiros || []).map(item => ({
+      user_id: usuarioAtual.id,
+      nome: item.nome,
+      tipo: item.tipo === "reserva_emergencia" ? "reserva_emergencia" : "objetivo",
+      valor_alvo: Number(item.valor_alvo),
+      valor_atual: Number(item.valor_atual || 0),
+      prazo: item.prazo || null,
+      status: ["ativo", "concluido", "pausado"].includes(item.status) ? item.status : "ativo"
+    }));
+
     const operacoes = [];
     if (novosLancamentos.length) operacoes.push(supabaseClient.from("lancamentos").insert(novosLancamentos));
     if (novasContas.length) operacoes.push(supabaseClient.from("contas_fixas").insert(novasContas));
     if (novosCartoes.length) operacoes.push(supabaseClient.from("cartoes_parcelas").insert(novosCartoes));
-    if (Number(dados.metaMensal) > 0) {
+    if (novosOrcamentos.length) operacoes.push(supabaseClient.from("orcamentos").insert(novosOrcamentos));
+    if (novosObjetivos.length) operacoes.push(supabaseClient.from("objetivos_financeiros").insert(novosObjetivos));
+    if (Array.isArray(dados.metasMensais) && dados.metasMensais.length) {
+      operacoes.push(supabaseClient.from("metas").upsert(dados.metasMensais.map(item => ({ user_id: usuarioAtual.id, mes: item.mes, valor: Number(item.valor) })), { onConflict: "user_id,mes" }));
+    }
+    if (!Array.isArray(dados.metasMensais) && Number(dados.metaMensal) > 0) {
       operacoes.push(supabaseClient.from("metas").upsert([{
         user_id: usuarioAtual.id,
         mes: primeiroDiaMesAtual(),
@@ -1506,8 +1655,7 @@ function editarParcelamento(id) {
   });
 }
 
-function parcelasCartaoDoMesAtual() {
-  const mesAtual = hojeTexto().slice(0, 7);
+function parcelasCartaoDoMes(mesReferencia = hojeTexto().slice(0, 7)) {
   let total = 0;
 
   cartoesParcelados.forEach(item => {
@@ -1517,13 +1665,17 @@ function parcelasCartaoDoMesAtual() {
 
     const mesParcela = proximoVencimento.slice(0, 7);
 
-    if (mesParcela === mesAtual) {
+    if (mesParcela === mesReferencia) {
       const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
       total += valorParcela;
     }
   });
 
   return total;
+}
+
+function parcelasCartaoDoMesAtual() {
+  return parcelasCartaoDoMes(hojeTexto().slice(0, 7));
 }
 
 function limparFormularioContaFixa() {
@@ -1571,9 +1723,139 @@ function editarContaFixa(id) {
   });
 }
 
+document.getElementById("formOrcamento").addEventListener("submit", async function(event) {
+  event.preventDefault();
+  const dados = {
+    user_id: usuarioAtual.id,
+    mes: `${mesDashboard}-01`,
+    categoria: document.getElementById("orcamentoCategoria").value.trim(),
+    limite: Number(document.getElementById("orcamentoLimite").value)
+  };
+  if (!dados.categoria || dados.limite <= 0) return alert("Preencha uma categoria e um limite maior que zero.");
+  const resposta = editandoOrcamentoId
+    ? await supabaseClient.from("orcamentos").update(dados).eq("id", editandoOrcamentoId).eq("user_id", usuarioAtual.id)
+    : await supabaseClient.from("orcamentos").insert([dados]);
+  if (resposta.error) return alert(mensagemErro(resposta.error, "Não foi possível salvar o orçamento."));
+  cancelarEdicaoOrcamento();
+  await carregarDados();
+  atualizarTudo();
+});
+
+function editarOrcamento(id) {
+  const item = orcamentos.find(o => o.id === id);
+  if (!item) return;
+  editandoOrcamentoId = id;
+  document.getElementById("orcamentoCategoria").value = item.categoria;
+  document.getElementById("orcamentoLimite").value = item.limite;
+  document.getElementById("tituloFormOrcamento").textContent = "Editar limite";
+  document.getElementById("botaoOrcamento").textContent = "Salvar alterações";
+  document.getElementById("cancelarOrcamento").classList.remove("hidden");
+}
+
+function cancelarEdicaoOrcamento() {
+  editandoOrcamentoId = null;
+  document.getElementById("formOrcamento").reset();
+  document.getElementById("tituloFormOrcamento").textContent = "Criar limite mensal";
+  document.getElementById("botaoOrcamento").textContent = "Salvar orçamento";
+  document.getElementById("cancelarOrcamento").classList.add("hidden");
+}
+
+async function removerOrcamento(id) {
+  if (!confirm("Excluir este orçamento?")) return;
+  const { error } = await supabaseClient.from("orcamentos").delete().eq("id", id).eq("user_id", usuarioAtual.id);
+  if (error) return alert(mensagemErro(error, "Não foi possível excluir."));
+  await carregarDados(); atualizarTudo();
+}
+
+document.getElementById("formObjetivo").addEventListener("submit", async function(event) {
+  event.preventDefault();
+  const valorAlvo = Number(document.getElementById("objetivoValorAlvo").value);
+  const valorAtual = Number(document.getElementById("objetivoValorAtual").value);
+  const dados = {
+    user_id: usuarioAtual.id,
+    nome: document.getElementById("objetivoNome").value.trim(),
+    tipo: document.getElementById("objetivoTipo").value,
+    valor_alvo: valorAlvo,
+    valor_atual: valorAtual,
+    prazo: document.getElementById("objetivoPrazo").value || null,
+    status: valorAtual >= valorAlvo ? "concluido" : "ativo"
+  };
+  if (!dados.nome || valorAlvo <= 0 || valorAtual < 0) return alert("Revise os dados do objetivo.");
+  const resposta = editandoObjetivoId
+    ? await supabaseClient.from("objetivos_financeiros").update(dados).eq("id", editandoObjetivoId).eq("user_id", usuarioAtual.id)
+    : await supabaseClient.from("objetivos_financeiros").insert([dados]);
+  if (resposta.error) return alert(mensagemErro(resposta.error, "Não foi possível salvar o objetivo."));
+  cancelarEdicaoObjetivo();
+  await carregarDados(); atualizarTudo();
+});
+
+function editarObjetivo(id) {
+  const item = objetivosFinanceiros.find(o => o.id === id);
+  if (!item) return;
+  editandoObjetivoId = id;
+  document.getElementById("objetivoNome").value = item.nome;
+  document.getElementById("objetivoTipo").value = item.tipo;
+  document.getElementById("objetivoValorAlvo").value = item.valor_alvo;
+  document.getElementById("objetivoValorAtual").value = item.valor_atual;
+  document.getElementById("objetivoPrazo").value = item.prazo || "";
+  document.getElementById("tituloFormObjetivo").textContent = "Editar objetivo";
+  document.getElementById("botaoObjetivo").textContent = "Salvar alterações";
+  document.getElementById("cancelarObjetivo").classList.remove("hidden");
+}
+
+function cancelarEdicaoObjetivo() {
+  editandoObjetivoId = null;
+  document.getElementById("formObjetivo").reset();
+  document.getElementById("objetivoValorAtual").value = 0;
+  document.getElementById("tituloFormObjetivo").textContent = "Transforme um plano em número";
+  document.getElementById("botaoObjetivo").textContent = "Salvar objetivo";
+  document.getElementById("cancelarObjetivo").classList.add("hidden");
+}
+
+async function aportarObjetivo(id) {
+  const valor = Number(prompt("Quanto você quer adicionar a este objetivo?"));
+  if (!valor || valor <= 0) return;
+  const { error } = await supabaseClient.rpc("aportar_objetivo", { p_objetivo_id: id, p_valor: valor });
+  if (error) return alert(mensagemErro(error, "Não foi possível registrar o aporte."));
+  await carregarDados(); atualizarTudo();
+}
+
+async function removerObjetivo(id) {
+  if (!confirm("Excluir este objetivo e todo o seu progresso?")) return;
+  const { error } = await supabaseClient.from("objetivos_financeiros").delete().eq("id", id).eq("user_id", usuarioAtual.id);
+  if (error) return alert(mensagemErro(error, "Não foi possível excluir."));
+  await carregarDados(); atualizarTudo();
+}
+
+function atualizarPlanejamento() {
+  if (!mesDashboard) return;
+  const listaOrcamentos = document.getElementById("listaOrcamentos");
+  const orcamentosMes = orcamentos.filter(item => item.mes?.slice(0, 7) === mesDashboard);
+  let totalLimites = 0;
+  let totalGasto = 0;
+  listaOrcamentos.innerHTML = orcamentosMes.length ? orcamentosMes.map(item => {
+    const limite = Number(item.limite);
+    const gasto = gastoCategoria(item.categoria, mesDashboard);
+    const percentual = limite > 0 ? gasto / limite * 100 : 0;
+    totalLimites += limite; totalGasto += gasto;
+    const classe = percentual > 100 ? "budget-danger" : percentual >= 80 ? "budget-warning" : "budget-ok";
+    return `<div class="budget-item"><div class="bar-label"><strong>${escaparHTML(item.categoria)}</strong><span>${formatarMoeda(gasto)} de ${formatarMoeda(limite)}</span></div><div class="budget-track"><span class="${classe}" style="width:${Math.min(percentual, 100)}%"></span></div><div class="budget-footer"><small>${Math.round(percentual)}% utilizado</small><div><button class="link-button" onclick="editarOrcamento(${item.id})">Editar</button><button class="link-button danger-text" onclick="removerOrcamento(${item.id})">Excluir</button></div></div></div>`;
+  }).join("") : '<p class="empty-state">Crie seu primeiro limite para o mês selecionado.</p>';
+  document.getElementById("saldoOrcamentos").textContent = formatarMoeda(totalLimites - totalGasto);
+  document.getElementById("resumoOrcamentos").textContent = orcamentosMes.length ? `${orcamentosMes.length} categoria(s)` : "Nenhum criado";
+
+  const listaObjetivos = document.getElementById("listaObjetivos");
+  listaObjetivos.innerHTML = objetivosFinanceiros.length ? objetivosFinanceiros.map(item => {
+    const alvo = Number(item.valor_alvo), atual = Number(item.valor_atual), progresso = Math.min(100, atual / alvo * 100);
+    return `<div class="goal-item ${item.status === "concluido" ? "goal-complete" : ""}"><div class="goal-heading"><div><span class="goal-type">${item.tipo === "reserva_emergencia" ? "Reserva" : "Objetivo"}</span><h3>${escaparHTML(item.nome)}</h3></div><strong>${Math.round(progresso)}%</strong></div><div class="budget-track"><span class="goal-progress" style="width:${progresso}%"></span></div><p>${formatarMoeda(atual)} de ${formatarMoeda(alvo)}${item.prazo ? ` · até ${formatarData(item.prazo)}` : ""}</p><div class="goal-actions"><button onclick="aportarObjetivo(${item.id})" ${item.status === "concluido" ? "disabled" : ""}>+ Adicionar valor</button><button class="secondary" onclick="editarObjetivo(${item.id})">Editar</button><button class="link-button danger-text" onclick="removerObjetivo(${item.id})">Excluir</button></div></div>`;
+  }).join("") : '<p class="empty-state">Cadastre uma reserva, uma viagem ou qualquer plano que mereça prioridade.</p>';
+  document.getElementById("resumoObjetivos").textContent = objetivosFinanceiros.length ? `${objetivosFinanceiros.filter(item => item.status === "concluido").length}/${objetivosFinanceiros.length} concluídos` : "Nenhum criado";
+}
+
 function atualizarTudo() {
   atualizarTela();
   atualizarContasFixas();
   atualizarCartoes();
   atualizarDashboard();
+  atualizarPlanejamento();
 }

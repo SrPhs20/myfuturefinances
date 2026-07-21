@@ -13,7 +13,7 @@
   <div class="container">
     <header>
       <h1>Minhas Finanças</h1>
-      <p>Controle receitas, despesas e contas fixas mensais.</p>
+      <p>Seu painel de decisões para gastar melhor, construir segurança e realizar planos.</p>
     </header>
 
     <div class="tabs">
@@ -21,9 +21,22 @@
       <button class="tab" onclick="mostrarAba('lancamentos')">Lançamentos</button>
       <button class="tab" onclick="mostrarAba('contas')">Contas Fixas</button>
       <button class="tab" onclick="mostrarAba('cartoes')">Cartões</button>
+      <button class="tab" onclick="mostrarAba('planejamento')">Planejamento</button>
     </div>
 
     <section id="abaDashboard">
+      <div class="dashboard-toolbar">
+        <div>
+          <span class="eyebrow">Visão financeira</span>
+          <h2 id="tituloMesDashboard">Seu mês em perspectiva</h2>
+        </div>
+        <div class="month-control">
+          <label for="mesDashboard">Mês analisado</label>
+          <input id="mesDashboard" type="month" onchange="alterarMesDashboard(this.value)" />
+          <button type="button" class="secondary small-button" onclick="voltarMesAtual()">Mês atual</button>
+        </div>
+      </div>
+
       <div class="cards">
         <div class="card">
           <h2>Saldo atual</h2>
@@ -41,16 +54,51 @@
         </div>
 
         <div class="card">
-          <h2>Economia do mês</h2>
-          <div id="dashEconomiaMes" class="value blue">R$ 0,00</div>
+          <h2>Taxa de economia</h2>
+          <div id="dashEconomiaMes" class="value blue">0%</div>
         </div>
+      </div>
+
+      <div class="coach-grid">
+        <article class="chart health-card">
+          <div class="score-ring" id="scoreRing"><strong id="scoreFinanceiro">0</strong><span>/ 100</span></div>
+          <div>
+            <span class="eyebrow">Placar de saúde financeira</span>
+            <h2 id="tituloScore">Comece a registrar</h2>
+            <p id="textoScore">O placar combina economia, compromissos, saldo previsto e respeito aos orçamentos.</p>
+          </div>
+        </article>
+        <article class="chart reserve-card">
+          <span class="eyebrow">Proteção</span>
+          <h2>Reserva de emergência</h2>
+          <div class="bar-label"><span id="reservaAtual">R$ 0,00 guardados</span><span id="reservaPercentual">0%</span></div>
+          <div class="meta-bar"><div id="barraReserva" class="meta-fill reserve-fill"></div></div>
+          <p id="textoReserva">Cadastre uma meta de reserva no Planejamento.</p>
+        </article>
+      </div>
+
+      <div class="dashboard-columns">
+        <div class="chart">
+          <div class="section-heading"><div><span class="eyebrow">Evolução</span><h2>Receitas x despesas — 6 meses</h2></div><div class="chart-legend"><span class="legend-income">Receitas</span><span class="legend-expense">Despesas</span></div></div>
+          <div id="graficoTendencia" class="trend-chart"></div>
+        </div>
+        <div class="chart">
+          <span class="eyebrow">Ação recomendada</span>
+          <h2>Seu copiloto financeiro</h2>
+          <div id="listaInsights" class="insight-list"></div>
+        </div>
+      </div>
+
+      <div class="chart">
+        <div class="section-heading"><div><span class="eyebrow">Agenda financeira</span><h2>Próximos compromissos</h2></div><button class="secondary small-button" type="button" onclick="mostrarAba('contas')">Ver contas</button></div>
+        <div id="proximosCompromissos" class="commitment-list"></div>
       </div>
 
       <div class="chart">
         <h2>Meta mensal</h2>
 
         <form id="formMeta">
-          <label>Quanto você quer guardar este mês?</label>
+          <label>Quanto você quer guardar no mês analisado?</label>
           <input id="valorMeta" type="number" step="0.01" placeholder="Ex. 1500,00" required />
           <button type="submit">Salvar meta</button>
         </form>
@@ -67,10 +115,7 @@
         </div>
       </div>
 
-      <div class="chart">
-        <h2>Resumo inteligente</h2>
-        <div id="alertaFinanceiro" class="alert-box"></div>
-      </div>
+      <div id="alertaFinanceiro" class="alert-box alert-neutral"></div>
     </section>
 
     <section id="abaLancamentos" class="hidden">
@@ -104,7 +149,13 @@
         </select>
 
         <label>Categoria</label>
-        <input id="categoria" type="text" placeholder="Ex. Alimentação, Salário, Transporte" required />
+        <input id="categoria" type="text" list="categoriasComuns" placeholder="Ex. Alimentação, Salário, Transporte" required />
+        <datalist id="categoriasComuns">
+          <option value="Alimentação"><option value="Moradia"><option value="Transporte">
+          <option value="Saúde"><option value="Educação"><option value="Lazer">
+          <option value="Assinaturas"><option value="Salário"><option value="Investimentos">
+          <option value="Conta fixa"><option value="Cartão de crédito"><option value="Outros">
+        </datalist>
 
         <label>Descrição</label>
         <input id="descricao" type="text" placeholder="Ex. Mercado do mês" required />
@@ -258,6 +309,46 @@
     <div id="listaCartoes"></div>
   </div>
 </section>
+
+    <section id="abaPlanejamento" class="hidden">
+      <div class="planning-hero">
+        <div><span class="eyebrow">Estratégia</span><h2>Dê um trabalho para cada real</h2><p>Defina limites para não gastar no automático e transforme sonhos em metas mensuráveis.</p></div>
+        <div class="planning-total"><span>Disponível nos orçamentos</span><strong id="saldoOrcamentos">R$ 0,00</strong></div>
+      </div>
+
+      <div class="planning-grid">
+        <div>
+          <form id="formOrcamento" class="planning-form">
+            <span class="eyebrow">Orçamento por categoria</span>
+            <h2 id="tituloFormOrcamento">Criar limite mensal</h2>
+            <label>Categoria</label>
+            <input id="orcamentoCategoria" list="categoriasComuns" placeholder="Ex. Alimentação" required />
+            <label>Limite para o mês analisado</label>
+            <input id="orcamentoLimite" type="number" min="0.01" step="0.01" placeholder="Ex. 800,00" required />
+            <button id="botaoOrcamento" type="submit">Salvar orçamento</button>
+            <button id="cancelarOrcamento" type="button" class="secondary hidden" onclick="cancelarEdicaoOrcamento()">Cancelar edição</button>
+          </form>
+          <div class="chart"><div class="section-heading"><div><span class="eyebrow">Limites do mês</span><h2>Orçamentos</h2></div><span id="resumoOrcamentos" class="soft-pill">Nenhum criado</span></div><div id="listaOrcamentos"></div></div>
+        </div>
+
+        <div>
+          <form id="formObjetivo" class="planning-form">
+            <span class="eyebrow">Objetivos financeiros</span>
+            <h2 id="tituloFormObjetivo">Transforme um plano em número</h2>
+            <label>Nome do objetivo</label>
+            <input id="objetivoNome" placeholder="Ex. Viagem, entrada do apartamento" required />
+            <label>Tipo</label>
+            <select id="objetivoTipo"><option value="objetivo">Objetivo</option><option value="reserva_emergencia">Reserva de emergência</option></select>
+            <div class="form-row"><div><label>Valor alvo</label><input id="objetivoValorAlvo" type="number" min="0.01" step="0.01" required /></div><div><label>Já guardado</label><input id="objetivoValorAtual" type="number" min="0" step="0.01" value="0" required /></div></div>
+            <label>Prazo (opcional)</label>
+            <input id="objetivoPrazo" type="date" />
+            <button id="botaoObjetivo" type="submit">Salvar objetivo</button>
+            <button id="cancelarObjetivo" type="button" class="secondary hidden" onclick="cancelarEdicaoObjetivo()">Cancelar edição</button>
+          </form>
+          <div class="chart"><div class="section-heading"><div><span class="eyebrow">Progresso</span><h2>Meus objetivos</h2></div><span id="resumoObjetivos" class="soft-pill">Nenhum criado</span></div><div id="listaObjetivos"></div></div>
+        </div>
+      </div>
+    </section>
 
   </div>
 

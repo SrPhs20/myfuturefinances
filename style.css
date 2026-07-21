@@ -695,3 +695,68 @@ span.flatpickr-weekday {
 .conta-futura:hover {
   opacity: 0.85;
 }
+
+/* Painel de orientação financeira */
+.eyebrow { display:block; color:#2563eb; font-size:.72rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; margin-bottom:5px; }
+.dashboard-toolbar, .section-heading, .planning-hero, .goal-heading, .budget-footer { display:flex; align-items:center; justify-content:space-between; gap:18px; }
+.dashboard-toolbar { margin:8px 0 20px; padding:22px 24px; color:white; border-radius:24px; background:linear-gradient(130deg,#0f172a,#1e3a8a 68%,#2563eb); box-shadow:0 18px 40px rgba(30,58,138,.18); }
+.dashboard-toolbar h2, .planning-hero h2 { margin:0; font-size:1.55rem; }
+.dashboard-toolbar .eyebrow { color:#93c5fd; }
+.month-control { display:grid; grid-template-columns:auto auto; gap:6px 10px; align-items:center; }
+.month-control label { grid-column:1/-1; color:#dbeafe; font-size:.78rem; }
+.month-control input { margin:0; min-width:150px; background:white; }
+.month-control button { margin:0; }
+.coach-grid, .dashboard-columns, .planning-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.health-card { display:flex; align-items:center; gap:24px; background:linear-gradient(145deg,#fff,#eff6ff); }
+.score-ring { --score:0deg; flex:0 0 132px; width:132px; height:132px; border-radius:50%; display:grid; place-content:center; text-align:center; background:radial-gradient(circle at center,#fff 60%,transparent 61%),conic-gradient(#2563eb var(--score),#dbeafe 0); }
+.score-ring strong { display:block; color:#0f172a; font-size:2.25rem; line-height:1; }
+.score-ring span { color:#64748b; font-size:.75rem; }
+.health-card p, .reserve-card p, .insight-item p, .commitment-item p, .goal-item p, .planning-hero p { color:#64748b; margin:6px 0 0; }
+.reserve-fill { background:linear-gradient(90deg,#14b8a6,#22c55e); }
+.dashboard-columns { margin-top:18px; }
+.chart-legend { display:flex; gap:12px; font-size:.75rem; color:#64748b; }
+.chart-legend span::before { content:""; display:inline-block; width:8px; height:8px; margin-right:5px; border-radius:50%; }
+.legend-income::before { background:#2563eb; }.legend-expense::before { background:#f97316; }
+.trend-chart { height:220px; display:flex; gap:12px; align-items:stretch; padding-top:18px; }
+.trend-column { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.trend-bars { width:100%; flex:1; display:flex; align-items:flex-end; justify-content:center; gap:4px; border-bottom:1px solid #e2e8f0; }
+.trend-bars span { width:min(18px,38%); min-height:0; border-radius:5px 5px 0 0; transition:height .35s ease; }
+.trend-income { background:linear-gradient(#60a5fa,#2563eb); }.trend-expense { background:linear-gradient(#fdba74,#f97316); }
+.trend-column small { color:#64748b; text-transform:capitalize; }
+.insight-list { display:grid; gap:10px; margin-top:14px; }
+.insight-item { display:flex; gap:12px; padding:12px; border:1px solid #e2e8f0; border-radius:14px; background:#f8fafc; }
+.insight-item>span { flex:0 0 34px; height:34px; display:grid; place-items:center; border-radius:10px; color:#1d4ed8; background:#dbeafe; font-weight:900; }
+.insight-item p { font-size:.82rem; }
+.commitment-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }
+.commitment-item { display:grid; grid-template-columns:48px 1fr auto; align-items:center; gap:12px; padding:12px; border:1px solid #e2e8f0; border-radius:14px; }
+.commitment-date { display:grid; place-items:center; padding:7px; border-radius:11px; background:#eff6ff; color:#1d4ed8; line-height:1; }
+.commitment-date span { margin-top:4px; font-size:.65rem; text-transform:uppercase; }
+
+/* Planejamento */
+.planning-hero { padding:28px; margin-bottom:18px; border-radius:24px; color:white; background:linear-gradient(135deg,#134e4a,#0f766e); }
+.planning-hero .eyebrow { color:#99f6e4; }.planning-hero p { color:#ccfbf1; }
+.planning-total { min-width:220px; padding:16px 20px; border:1px solid rgba(255,255,255,.22); border-radius:16px; background:rgba(255,255,255,.1); }
+.planning-total span { display:block; font-size:.76rem; color:#ccfbf1; }.planning-total strong { display:block; margin-top:4px; font-size:1.45rem; }
+.planning-form { margin-top:0; border-top:4px solid #2563eb; }
+.planning-form h2 { margin:2px 0 8px; }.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }.form-row input { width:100%; }
+.soft-pill, .goal-type { padding:5px 9px; border-radius:999px; color:#1d4ed8; background:#dbeafe; font-size:.72rem; font-weight:700; }
+.budget-item, .goal-item { padding:15px 0; border-bottom:1px solid #e2e8f0; }.budget-item:last-child,.goal-item:last-child { border-bottom:0; }
+.budget-track { height:9px; overflow:hidden; margin:9px 0; border-radius:999px; background:#e2e8f0; }.budget-track span { display:block; height:100%; border-radius:inherit; }.budget-ok { background:#22c55e; }.budget-warning { background:#f59e0b; }.budget-danger { background:#ef4444; }.goal-progress { background:linear-gradient(90deg,#2563eb,#8b5cf6); }
+.budget-footer small { color:#64748b; }.link-button { width:auto; margin:0; padding:5px 8px; border:0; color:#2563eb; background:transparent; box-shadow:none; }.link-button:hover { background:#eff6ff; }.danger-text { color:#dc2626; }
+.goal-heading h3 { margin:5px 0 0; }.goal-actions { display:flex; gap:8px; align-items:center; }.goal-actions button { width:auto; margin:0; padding:8px 11px; }.goal-complete { opacity:.72; }.goal-complete .goal-type { color:#166534; background:#dcfce7; }
+.empty-state { padding:18px; border:1px dashed #cbd5e1; border-radius:14px; text-align:center; color:#64748b; }
+
+@media (max-width: 820px) {
+  .coach-grid,.dashboard-columns,.planning-grid { grid-template-columns:1fr; }
+  .commitment-list { grid-template-columns:1fr; }
+  .dashboard-toolbar,.planning-hero { align-items:flex-start; flex-direction:column; }
+  .planning-total { width:100%; min-width:0; }
+}
+
+@media (max-width: 520px) {
+  .health-card { align-items:flex-start; flex-direction:column; }
+  .score-ring { flex-basis:112px; width:112px; height:112px; }
+  .form-row { grid-template-columns:1fr; }
+  .commitment-item { grid-template-columns:42px 1fr; }.commitment-item>strong:last-child { grid-column:2; }
+  .section-heading { align-items:flex-start; flex-direction:column; }
+}

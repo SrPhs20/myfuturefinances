@@ -1,6 +1,8 @@
 # My Future Finances
 
-Aplicativo financeiro pessoal integrado ao Supabase, com autenticação, lançamentos, contas fixas, metas mensais, compras parceladas e perfil com avatar.
+Aplicativo financeiro pessoal integrado ao Supabase, com autenticação, lançamentos, contas fixas, metas mensais, compras parceladas, orçamentos por categoria, objetivos, reserva de emergência e perfil com avatar.
+
+O dashboard funciona como um orientador: calcula um placar de saúde financeira, compara seis meses, mede a taxa de economia, sinaliza estouros de orçamento e antecipa compromissos.
 
 ## Estrutura
 
@@ -13,7 +15,7 @@ Aplicativo financeiro pessoal integrado ao Supabase, com autenticação, lançam
 ## Configurar o Supabase
 
 1. Abra o SQL Editor do projeto `hjafylznpribmpumcgtk`.
-2. Execute `supabase/migrations/20260721143000_finance_app.sql`.
+2. Execute, na ordem, `supabase/migrations/20260721143000_finance_app.sql` e `supabase/migrations/20260721160000_financial_coach.sql`.
 3. Publique a Edge Function `delete-account` mantendo a verificação de JWT habilitada.
 4. Em Authentication > URL Configuration, cadastre a URL de produção e as URLs locais permitidas.
 

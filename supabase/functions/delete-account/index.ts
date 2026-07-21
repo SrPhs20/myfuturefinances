@@ -33,7 +33,7 @@ Deno.serve(async (request) => {
       `${userData.user.id}/avatar.webp`,
     ]);
 
-    for (const table of ["lancamentos", "contas_fixas", "metas", "cartoes_parcelas", "perfis"]) {
+    for (const table of ["lancamentos", "contas_fixas", "metas", "cartoes_parcelas", "orcamentos", "objetivos_financeiros", "perfis"]) {
       const { error: dataError } = await admin.from(table).delete().eq("user_id", userData.user.id);
       if (dataError) throw dataError;
     }
