@@ -267,6 +267,7 @@ async function iniciarApp() {
     await carregarDados();
 
     configurarCalendarios();
+    document.getElementById("rapidoData").value = hojeTexto();
     atualizarTudo();
     fecharPerfil();
   } catch (error) {
@@ -491,6 +492,172 @@ form.addEventListener("submit", async function(e) {
   await carregarDados();
   atualizarTela();
   limparFormularioLancamento();
+});
+
+function definirStatusAssistente(texto, tipo = "") {
+  const status = document.getElementById("statusAssistente");
+  status.textContent = texto;
+  status.className = `assistant-status ${tipo}`.trim();
+}
+
+function normalizarTexto(texto) {
+  return String(texto || "").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function numeroFaladoParaValor(texto) {
+  const unidades = { zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13, quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19 };
+  const dezenas = { vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90 };
+  const centenas = { cem: 100, cento: 100, duzentos: 200, trezentos: 300, quatrocentos: 400, quinhentos: 500, seiscentos: 600, setecentos: 700, oitocentos: 800, novecentos: 900 };
+  const tokens = normalizarTexto(texto).split(/\s+/);
+  let total = 0;
+  let bloco = 0;
+  let reconhecidos = 0;
+  tokens.forEach(token => {
+    if (token === "e") return;
+    if (Object.hasOwn(unidades, token)) { bloco += unidades[token]; reconhecidos += 1; }
+    else if (Object.hasOwn(dezenas, token)) { bloco += dezenas[token]; reconhecidos += 1; }
+    else if (Object.hasOwn(centenas, token)) { bloco += centenas[token]; reconhecidos += 1; }
+    else if (token === "mil") { total += Math.max(bloco, 1) * 1000; bloco = 0; reconhecidos += 1; }
+  });
+  return reconhecidos ? total + bloco : 0;
+}
+
+function extrairValorAssistente(textoOriginal) {
+  const texto = normalizarTexto(textoOriginal);
+  const moeda = texto.match(/(?:r\$\s*)?(\d[\d.]*?(?:,\d{1,2})?)\s*(?:reais|real)\b/);
+  const aposVerbo = texto.match(/(?:gastei|paguei|comprei|recebi|ganhei|entrou|vendi|despesa|gasto|ganho)\D{0,15}(\d[\d.,]*)/);
+  const candidato = moeda?.[1] || aposVerbo?.[1] || texto.match(/\b\d+(?:[.,]\d{1,2})?\b/)?.[0];
+  if (candidato) {
+    const limpo = candidato.includes(",") ? candidato.replaceAll(".", "").replace(",", ".") : candidato;
+    const valor = Number(limpo);
+    if (valor > 0) return valor;
+  }
+  const antesDeReais = texto.match(/((?:[a-z]+\s+){0,8}[a-z]+)\s+(?:reais|real)\b/)?.[1] || texto;
+  return numeroFaladoParaValor(antesDeReais);
+}
+
+function inferirCategoriaAssistente(texto) {
+  const regras = [
+    ["Alimentação", ["mercado", "supermercado", "restaurante", "lanche", "comida", "ifood", "padaria"]],
+    ["Transporte", ["gasolina", "combustivel", "uber", "99", "onibus", "metro", "estacionamento"]],
+    ["Moradia", ["aluguel", "condominio", "energia", "luz", "agua", "internet"]],
+    ["Saúde", ["farmacia", "remedio", "medico", "consulta", "exame", "dentista"]],
+    ["Educação", ["curso", "faculdade", "escola", "livro", "mensalidade"]],
+    ["Lazer", ["cinema", "viagem", "bar", "show", "jogo"]],
+    ["Assinaturas", ["netflix", "spotify", "assinatura", "prime", "disney"]],
+    ["Salário", ["salario", "pagamento", "holerite"]],
+    ["Investimentos", ["investimento", "dividendo", "rendimento", "aplicacao"]]
+  ];
+  return regras.find(([, palavras]) => palavras.some(palavra => texto.includes(palavra)))?.[0] || "Outros";
+}
+
+function dataComDiferenca(dias) {
+  const data = new Date();
+  data.setDate(data.getDate() + dias);
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function inferirDataAssistente(texto) {
+  if (texto.includes("anteontem")) return dataComDiferenca(-2);
+  if (texto.includes("ontem")) return dataComDiferenca(-1);
+  const dataFalada = texto.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);
+  if (dataFalada) {
+    const anoInformado = dataFalada[3] ? Number(dataFalada[3]) : new Date().getFullYear();
+    const ano = anoInformado < 100 ? 2000 + anoInformado : anoInformado;
+    return `${ano}-${String(Number(dataFalada[2])).padStart(2, "0")}-${String(Number(dataFalada[1])).padStart(2, "0")}`;
+  }
+  return hojeTexto();
+}
+
+function interpretarLancamento(textoOriginal) {
+  const texto = normalizarTexto(textoOriginal);
+  const palavrasReceita = ["recebi", "ganhei", "entrou", "vendi", "salario", "rendimento", "receita"];
+  const tipo = palavrasReceita.some(palavra => texto.includes(palavra)) ? "receita" : "despesa";
+  const valor = extrairValorAssistente(textoOriginal);
+  const categoria = inferirCategoriaAssistente(texto);
+  const descricao = textoOriginal.trim().replace(/^./, letra => letra.toLocaleUpperCase("pt-BR")).slice(0, 180);
+
+  document.getElementById("rapidoTipo").value = tipo;
+  document.getElementById("rapidoValor").value = valor > 0 ? valor.toFixed(2) : "";
+  document.getElementById("rapidoCategoria").value = categoria;
+  document.getElementById("rapidoDescricao").value = descricao || categoria;
+  document.getElementById("rapidoData").value = inferirDataAssistente(texto);
+
+  if (valor > 0) {
+    definirStatusAssistente(`Entendi: ${tipo === "receita" ? "ganho" : "gasto"} de ${formatarMoeda(valor)} em ${categoria}. Confira e toque em Adicionar lançamento.`, "success");
+  } else {
+    definirStatusAssistente("Entendi parte da frase, mas não encontrei o valor. Digite o valor antes de salvar.", "error");
+  }
+}
+
+function interpretarComandoDigitado() {
+  const comando = document.getElementById("comandoAssistente").value.trim();
+  if (!comando) return definirStatusAssistente("Digite uma frase ou use o botão Falar.", "error");
+  interpretarLancamento(comando);
+}
+
+function ouvirLancamento() {
+  const ReconhecimentoVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!ReconhecimentoVoz) {
+    definirStatusAssistente("Este navegador não oferece reconhecimento de voz. Você ainda pode digitar a frase ou usar o formulário rápido.", "error");
+    return;
+  }
+
+  const reconhecimento = new ReconhecimentoVoz();
+  const botao = document.getElementById("botaoMicrofone");
+  reconhecimento.lang = "pt-BR";
+  reconhecimento.interimResults = false;
+  reconhecimento.maxAlternatives = 1;
+  botao.classList.add("listening");
+  botao.innerHTML = "<span>●</span> Ouvindo...";
+  definirStatusAssistente("Pode falar. Exemplo: gastei 42 reais na farmácia ontem.");
+
+  reconhecimento.onresult = evento => {
+    const transcricao = evento.results[0][0].transcript;
+    document.getElementById("comandoAssistente").value = transcricao;
+    interpretarLancamento(transcricao);
+  };
+  reconhecimento.onerror = () => definirStatusAssistente("Não consegui ouvir com clareza. Tente novamente ou digite a frase.", "error");
+  reconhecimento.onend = () => {
+    botao.classList.remove("listening");
+    botao.innerHTML = "<span>●</span> Falar";
+  };
+  try { reconhecimento.start(); } catch (error) { reconhecimento.onend(); definirStatusAssistente("O microfone já está em uso. Aguarde um instante e tente novamente.", "error"); }
+}
+
+document.getElementById("comandoAssistente").addEventListener("keydown", event => {
+  if (event.key === "Enter") { event.preventDefault(); interpretarComandoDigitado(); }
+});
+
+document.getElementById("formLancamentoRapido").addEventListener("submit", async event => {
+  event.preventDefault();
+  const botao = document.getElementById("botaoSalvarRapido");
+  const novo = {
+    tipo: document.getElementById("rapidoTipo").value,
+    valor: Number(document.getElementById("rapidoValor").value),
+    categoria: document.getElementById("rapidoCategoria").value.trim(),
+    descricao: document.getElementById("rapidoDescricao").value.trim(),
+    data: document.getElementById("rapidoData").value || hojeTexto(),
+    user_id: usuarioAtual.id
+  };
+  if (!novo.categoria || !novo.descricao || novo.valor <= 0) return definirStatusAssistente("Revise o valor, a categoria e a descrição.", "error");
+
+  botao.disabled = true;
+  botao.textContent = "Salvando...";
+  const { error } = await supabaseClient.from("lancamentos").insert([novo]);
+  botao.disabled = false;
+  botao.textContent = "Adicionar lançamento";
+  if (error) return definirStatusAssistente(mensagemErro(error, "Não foi possível salvar o lançamento."), "error");
+
+  await carregarDados();
+  atualizarTudo();
+  document.getElementById("formLancamentoRapido").reset();
+  document.getElementById("comandoAssistente").value = "";
+  document.getElementById("rapidoData").value = hojeTexto();
+  definirStatusAssistente(`Lançamento de ${formatarMoeda(novo.valor)} adicionado. O saldo geral e o mês foram atualizados.`, "success");
 });
 
 function editarLancamento(id) {
@@ -779,6 +946,8 @@ function atualizarDashboard() {
   const orcamentosMes = orcamentos.filter(item => item.mes?.slice(0, 7) === mesDashboard);
   const score = calcularSaudeFinanceira({ receitas, despesas, saldoPrevisto, contasPendentes, orcamentosMes });
 
+  atualizarResumoGeral();
+
   document.getElementById("mesDashboard").value = mesDashboard;
   document.getElementById("tituloMesDashboard").textContent = nomeDoMes(mesDashboard).replace(/^./, letra => letra.toUpperCase());
   document.getElementById("dashSaldoAtual").textContent = formatarMoeda(saldoAtual);
@@ -808,6 +977,41 @@ function atualizarDashboard() {
   atualizarInsights({ receitas, despesas, saldoPrevisto, taxaEconomia, orcamentosMes });
   atualizarCompromissos();
   atualizarReserva();
+}
+
+function dividaCartoesTotal() {
+  return cartoesParcelados.reduce((total, item) => {
+    const parcelasRestantes = Math.max(0, Number(item.total_parcelas) - Number(item.parcelas_pagas));
+    return total + (Number(item.valor_total) / Number(item.total_parcelas)) * parcelasRestantes;
+  }, 0);
+}
+
+function atualizarResumoGeral() {
+  const totais = lancamentos.reduce((resumo, item) => {
+    resumo[item.tipo] += Number(item.valor);
+    return resumo;
+  }, { receita: 0, despesa: 0 });
+  const saldoAcumulado = totais.receita - totais.despesa;
+  const contasEmAberto = contasFixas.reduce((total, conta) => total + Number(conta.valor), 0);
+  const compromissos = contasEmAberto + dividaCartoesTotal();
+  const saldoLiquido = saldoAcumulado - compromissos;
+
+  const campos = {
+    saldoAcumuladoGeral: saldoAcumulado,
+    receitasAcumuladas: totais.receita,
+    despesasAcumuladas: totais.despesa,
+    dividasAbertasGeral: compromissos,
+    saldoLiquidoGeral: saldoLiquido
+  };
+
+  Object.entries(campos).forEach(([id, valor]) => {
+    const elemento = document.getElementById(id);
+    elemento.textContent = formatarMoeda(valor);
+    const representaSaida = id === "despesasAcumuladas" || id === "dividasAbertasGeral";
+    const representaEntrada = id === "receitasAcumuladas";
+    elemento.classList.toggle("negative", representaSaida || (!representaEntrada && valor < 0));
+    elemento.classList.toggle("positive", representaEntrada || (!representaSaida && valor >= 0));
+  });
 }
 
 function atualizarMetaMensal() {

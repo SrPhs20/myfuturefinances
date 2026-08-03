@@ -25,6 +25,48 @@
     </div>
 
     <section id="abaDashboard">
+      <section class="patrimonio-hero">
+        <div class="patrimonio-main">
+          <span class="eyebrow">Visão geral · todos os períodos</span>
+          <p>Seu saldo acumulado</p>
+          <strong id="saldoAcumuladoGeral">R$ 0,00</strong>
+          <small>Entradas menos saídas de todos os lançamentos já registrados.</small>
+        </div>
+        <div class="patrimonio-metrics">
+          <div><span>Total que entrou</span><strong id="receitasAcumuladas">R$ 0,00</strong></div>
+          <div><span>Total que saiu</span><strong id="despesasAcumuladas">R$ 0,00</strong></div>
+          <div><span>Dívidas e contas abertas</span><strong id="dividasAbertasGeral">R$ 0,00</strong></div>
+          <div class="metric-projected"><span>Saldo após compromissos</span><strong id="saldoLiquidoGeral">R$ 0,00</strong></div>
+        </div>
+      </section>
+
+      <section class="voice-assistant chart">
+        <div class="assistant-heading">
+          <div>
+            <span class="eyebrow">Lançamento rápido</span>
+            <h2>Assistente financeiro por voz</h2>
+            <p>Diga “gastei 85 reais no mercado hoje” ou “recebi 2.500 de salário”.</p>
+          </div>
+          <button id="botaoMicrofone" type="button" class="mic-button" onclick="ouvirLancamento()" aria-label="Falar lançamento"><span>●</span> Falar</button>
+        </div>
+
+        <div class="assistant-command">
+          <input id="comandoAssistente" type="text" placeholder="Digite ou fale o que aconteceu com seu dinheiro..." />
+          <button type="button" class="secondary" onclick="interpretarComandoDigitado()">Interpretar</button>
+        </div>
+        <p id="statusAssistente" class="assistant-status">Pronto para ouvir ou receber um lançamento manual.</p>
+
+        <form id="formLancamentoRapido" class="quick-entry-form">
+          <div><label>Foi</label><select id="rapidoTipo"><option value="despesa">Gasto</option><option value="receita">Ganho</option></select></div>
+          <div><label>Valor</label><input id="rapidoValor" type="number" min="0.01" step="0.01" placeholder="0,00" required /></div>
+          <div><label>Categoria</label><input id="rapidoCategoria" list="categoriasComuns" placeholder="Ex. Alimentação" required /></div>
+          <div class="quick-description"><label>Descrição</label><input id="rapidoDescricao" placeholder="Ex. Mercado" required /></div>
+          <div><label>Data</label><input id="rapidoData" type="date" required /></div>
+          <button id="botaoSalvarRapido" type="submit">Adicionar lançamento</button>
+        </form>
+        <small class="privacy-note">O áudio é transcrito pelo recurso de voz do navegador. Somente o lançamento confirmado é salvo na sua conta.</small>
+      </section>
+
       <div class="dashboard-toolbar">
         <div>
           <span class="eyebrow">Visão financeira</span>
@@ -39,7 +81,7 @@
 
       <div class="cards">
         <div class="card">
-          <h2>Saldo atual</h2>
+          <h2>Saldo do mês</h2>
           <div id="dashSaldoAtual" class="value blue">R$ 0,00</div>
         </div>
 
@@ -49,7 +91,7 @@
         </div>
 
         <div class="card">
-          <h2>Saldo previsto</h2>
+          <h2>Saldo previsto do mês</h2>
           <div id="dashSaldoPrevisto" class="value positive">R$ 0,00</div>
         </div>
 
