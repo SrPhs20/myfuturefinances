@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
   <div class="container">
@@ -45,14 +45,18 @@
           <div>
             <span class="eyebrow">Lançamento rápido</span>
             <h2>Assistente financeiro por voz</h2>
-            <p>Diga “gastei 85 reais no mercado hoje” ou “recebi 2.500 de salário”.</p>
+            <p>1. Fale. 2. Pause quando quiser. 3. Confira a transcrição. 4. Peça para interpretar.</p>
           </div>
-          <button id="botaoMicrofone" type="button" class="mic-button" onclick="ouvirLancamento()" aria-label="Falar lançamento"><span>●</span> Falar</button>
+          <div class="voice-controls">
+            <button id="botaoMicrofone" type="button" class="mic-button" aria-label="Iniciar ou continuar gravação"><span>●</span> Começar</button>
+            <button id="botaoPausarMicrofone" type="button" class="secondary voice-control-button hidden" aria-label="Pausar gravação">Pausar</button>
+            <button id="botaoCancelarMicrofone" type="button" class="danger voice-control-button hidden" aria-label="Cancelar gravação">Cancelar</button>
+          </div>
         </div>
 
         <div class="assistant-command">
           <input id="comandoAssistente" type="text" placeholder="Digite ou fale o que aconteceu com seu dinheiro..." />
-          <button type="button" class="secondary" onclick="interpretarComandoDigitado()">Interpretar</button>
+          <button id="botaoInterpretarAssistente" type="button" class="secondary">Interpretar antes de enviar</button>
         </div>
         <p id="statusAssistente" class="assistant-status">Pronto para ouvir ou receber um lançamento manual.</p>
 
@@ -64,7 +68,7 @@
           <div><label>Data</label><input id="rapidoData" type="date" required /></div>
           <button id="botaoSalvarRapido" type="submit">Adicionar lançamento</button>
         </form>
-        <small class="privacy-note">O áudio é transcrito pelo recurso de voz do navegador. Somente o lançamento confirmado é salvo na sua conta.</small>
+        <small class="privacy-note">A transcrição não envia nenhum lançamento. Depois de interpretar, você ainda confere os campos e toca em “Adicionar lançamento”.</small>
       </section>
 
       <div class="dashboard-toolbar">
@@ -397,6 +401,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>

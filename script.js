@@ -22,6 +22,12 @@ let calendarioCartaoPrimeiraParcela;
 let editandoContaFixaId = null;
 let editandoOrcamentoId = null;
 let editandoObjetivoId = null;
+let reconhecimentoAssistente = null;
+let transcricaoAssistente = "";
+let trechoFinalSessao = "";
+let escutaAssistenteAtiva = false;
+let escutaAssistentePausada = false;
+let cancelamentoAssistente = false;
 
 const appContainer = document.querySelector(".container");
 appContainer.classList.add("hidden");
@@ -596,38 +602,114 @@ function interpretarLancamento(textoOriginal) {
 function interpretarComandoDigitado() {
   const comando = document.getElementById("comandoAssistente").value.trim();
   if (!comando) return definirStatusAssistente("Digite uma frase ou use o botão Falar.", "error");
+  if (escutaAssistenteAtiva) pausarEscutaAssistente();
   interpretarLancamento(comando);
 }
 
-function ouvirLancamento() {
+function atualizarControlesAssistente(estado) {
+  const botaoPrincipal = document.getElementById("botaoMicrofone");
+  const botaoPausar = document.getElementById("botaoPausarMicrofone");
+  const botaoCancelar = document.getElementById("botaoCancelarMicrofone");
+  const ouvindo = estado === "ouvindo";
+  const pausado = estado === "pausado";
+
+  botaoPrincipal.disabled = ouvindo;
+  botaoPrincipal.classList.toggle("listening", ouvindo);
+  botaoPrincipal.innerHTML = ouvindo
+    ? "<span>●</span> Ouvindo..."
+    : pausado ? "<span>●</span> Continuar" : "<span>●</span> Começar";
+  botaoPausar.classList.toggle("hidden", !ouvindo);
+  botaoCancelar.classList.toggle("hidden", estado === "parado" && !document.getElementById("comandoAssistente").value.trim());
+}
+
+function iniciarOuContinuarEscuta() {
   const ReconhecimentoVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!ReconhecimentoVoz) {
-    definirStatusAssistente("Este navegador não oferece reconhecimento de voz. Você ainda pode digitar a frase ou usar o formulário rápido.", "error");
+    definirStatusAssistente("O clique funcionou, mas este navegador não possui transcrição por voz. No computador, use Chrome ou Edge atualizado; o campo de texto continua disponível.", "error");
     return;
   }
 
-  const reconhecimento = new ReconhecimentoVoz();
-  const botao = document.getElementById("botaoMicrofone");
-  reconhecimento.lang = "pt-BR";
-  reconhecimento.interimResults = false;
-  reconhecimento.maxAlternatives = 1;
-  botao.classList.add("listening");
-  botao.innerHTML = "<span>●</span> Ouvindo...";
-  definirStatusAssistente("Pode falar. Exemplo: gastei 42 reais na farmácia ontem.");
+  if (reconhecimentoAssistente) return;
+  cancelamentoAssistente = false;
+  escutaAssistenteAtiva = true;
+  escutaAssistentePausada = false;
+  trechoFinalSessao = "";
+  reconhecimentoAssistente = new ReconhecimentoVoz();
+  reconhecimentoAssistente.lang = "pt-BR";
+  reconhecimentoAssistente.interimResults = true;
+  reconhecimentoAssistente.continuous = true;
+  reconhecimentoAssistente.maxAlternatives = 1;
+  atualizarControlesAssistente("ouvindo");
+  definirStatusAssistente("Estou ouvindo. Pause quando quiser; nada será interpretado ou salvo enquanto você fala.");
 
-  reconhecimento.onresult = evento => {
-    const transcricao = evento.results[0][0].transcript;
-    document.getElementById("comandoAssistente").value = transcricao;
-    interpretarLancamento(transcricao);
+  reconhecimentoAssistente.onresult = evento => {
+    let trechoParcial = "";
+    for (let indice = evento.resultIndex; indice < evento.results.length; indice += 1) {
+      const trecho = evento.results[indice][0].transcript.trim();
+      if (evento.results[indice].isFinal) trechoFinalSessao += `${trecho} `;
+      else trechoParcial += `${trecho} `;
+    }
+    document.getElementById("comandoAssistente").value = `${transcricaoAssistente} ${trechoFinalSessao} ${trechoParcial}`.replace(/\s+/g, " ").trim();
   };
-  reconhecimento.onerror = () => definirStatusAssistente("Não consegui ouvir com clareza. Tente novamente ou digite a frase.", "error");
-  reconhecimento.onend = () => {
-    botao.classList.remove("listening");
-    botao.innerHTML = "<span>●</span> Falar";
+
+  reconhecimentoAssistente.onerror = evento => {
+    if (evento.error === "no-speech" || evento.error === "aborted") return;
+    escutaAssistenteAtiva = false;
+    escutaAssistentePausada = false;
+    definirStatusAssistente(evento.error === "not-allowed"
+      ? "O acesso ao microfone foi bloqueado. Libere o microfone nas permissões do navegador e tente novamente."
+      : "Não consegui usar o microfone. Você pode tentar novamente ou digitar a frase.", "error");
   };
-  try { reconhecimento.start(); } catch (error) { reconhecimento.onend(); definirStatusAssistente("O microfone já está em uso. Aguarde um instante e tente novamente.", "error"); }
+
+  reconhecimentoAssistente.onend = () => {
+    transcricaoAssistente = `${transcricaoAssistente} ${trechoFinalSessao}`.replace(/\s+/g, " ").trim();
+    trechoFinalSessao = "";
+    reconhecimentoAssistente = null;
+    if (cancelamentoAssistente) { atualizarControlesAssistente("parado"); return; }
+    if (escutaAssistenteAtiva && !escutaAssistentePausada) {
+      setTimeout(iniciarOuContinuarEscuta, 250);
+      return;
+    }
+    atualizarControlesAssistente(escutaAssistentePausada ? "pausado" : "parado");
+  };
+
+  try {
+    reconhecimentoAssistente.start();
+  } catch (error) {
+    reconhecimentoAssistente = null;
+    escutaAssistenteAtiva = false;
+    atualizarControlesAssistente("parado");
+    definirStatusAssistente("O microfone já está em uso. Aguarde um instante e tente novamente.", "error");
+  }
 }
 
+function pausarEscutaAssistente() {
+  escutaAssistenteAtiva = false;
+  escutaAssistentePausada = true;
+  reconhecimentoAssistente?.stop();
+  atualizarControlesAssistente("pausado");
+  definirStatusAssistente("Áudio pausado. Confira o texto, continue falando ou clique em “Interpretar antes de enviar”.");
+}
+
+function cancelarEscutaAssistente() {
+  cancelamentoAssistente = true;
+  escutaAssistenteAtiva = false;
+  escutaAssistentePausada = false;
+  reconhecimentoAssistente?.abort();
+  reconhecimentoAssistente = null;
+  transcricaoAssistente = "";
+  trechoFinalSessao = "";
+  document.getElementById("comandoAssistente").value = "";
+  document.getElementById("formLancamentoRapido").reset();
+  document.getElementById("rapidoData").value = hojeTexto();
+  atualizarControlesAssistente("parado");
+  definirStatusAssistente("Gravação cancelada. Nenhum lançamento foi criado.");
+}
+
+document.getElementById("botaoMicrofone").addEventListener("click", iniciarOuContinuarEscuta);
+document.getElementById("botaoPausarMicrofone").addEventListener("click", pausarEscutaAssistente);
+document.getElementById("botaoCancelarMicrofone").addEventListener("click", cancelarEscutaAssistente);
+document.getElementById("botaoInterpretarAssistente").addEventListener("click", interpretarComandoDigitado);
 document.getElementById("comandoAssistente").addEventListener("keydown", event => {
   if (event.key === "Enter") { event.preventDefault(); interpretarComandoDigitado(); }
 });
@@ -657,6 +739,10 @@ document.getElementById("formLancamentoRapido").addEventListener("submit", async
   document.getElementById("formLancamentoRapido").reset();
   document.getElementById("comandoAssistente").value = "";
   document.getElementById("rapidoData").value = hojeTexto();
+  transcricaoAssistente = "";
+  trechoFinalSessao = "";
+  escutaAssistentePausada = false;
+  atualizarControlesAssistente("parado");
   definirStatusAssistente(`Lançamento de ${formatarMoeda(novo.valor)} adicionado. O saldo geral e o mês foram atualizados.`, "success");
 });
 
