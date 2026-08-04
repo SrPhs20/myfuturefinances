@@ -28,6 +28,8 @@ let trechoFinalSessao = "";
 let escutaAssistenteAtiva = false;
 let escutaAssistentePausada = false;
 let cancelamentoAssistente = false;
+let finalizacaoAssistentePendente = false;
+let permissaoMicrofoneConcedida = false;
 
 const appContainer = document.querySelector(".container");
 appContainer.classList.add("hidden");
@@ -275,6 +277,7 @@ async function iniciarApp() {
     configurarCalendarios();
     document.getElementById("rapidoData").value = hojeTexto();
     atualizarTudo();
+    prepararPermissaoMicrofone();
     fecharPerfil();
   } catch (error) {
     appContainer.classList.add("hidden");
@@ -506,6 +509,63 @@ function definirStatusAssistente(texto, tipo = "") {
   status.className = `assistant-status ${tipo}`.trim();
 }
 
+function abrirPermissaoMicrofone(bloqueado = false) {
+  document.getElementById("instrucaoMicrofoneBloqueado").classList.toggle("hidden", !bloqueado);
+  document.getElementById("modalPermissaoMicrofone").classList.remove("hidden");
+}
+
+function fecharPermissaoMicrofone() {
+  document.getElementById("modalPermissaoMicrofone").classList.add("hidden");
+}
+
+async function solicitarPermissaoMicrofone() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    abrirPermissaoMicrofone(true);
+    definirStatusAssistente("Este navegador não permite solicitar o microfone. Use Chrome ou Edge atualizado.", "error");
+    return false;
+  }
+
+  try {
+    const fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
+    fluxo.getTracks().forEach(trilha => trilha.stop());
+    permissaoMicrofoneConcedida = true;
+    fecharPermissaoMicrofone();
+    definirStatusAssistente("Microfone liberado. Toque em “Começar” quando quiser falar.", "success");
+    return true;
+  } catch (error) {
+    permissaoMicrofoneConcedida = false;
+    abrirPermissaoMicrofone(true);
+    definirStatusAssistente("O microfone continua bloqueado. Altere a permissão deste site para “Permitir” e atualize a página.", "error");
+    return false;
+  }
+}
+
+async function prepararPermissaoMicrofone() {
+  const ReconhecimentoVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!ReconhecimentoVoz || !navigator.mediaDevices?.getUserMedia) return;
+  try {
+    if (navigator.permissions?.query) {
+      const permissao = await navigator.permissions.query({ name: "microphone" });
+      if (permissao.state === "granted") {
+        permissaoMicrofoneConcedida = true;
+        return;
+      }
+      abrirPermissaoMicrofone(permissao.state === "denied");
+      permissao.onchange = () => {
+        permissaoMicrofoneConcedida = permissao.state === "granted";
+        if (permissaoMicrofoneConcedida) fecharPermissaoMicrofone();
+      };
+      return;
+    }
+  } catch (error) {
+    console.info("Consulta de permissão de microfone indisponível.");
+  }
+  abrirPermissaoMicrofone(false);
+}
+
+document.getElementById("botaoPermitirMicrofone").addEventListener("click", solicitarPermissaoMicrofone);
+document.getElementById("botaoAgoraNaoMicrofone").addEventListener("click", fecharPermissaoMicrofone);
+
 function normalizarTexto(texto) {
   return String(texto || "").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -609,6 +669,7 @@ function interpretarComandoDigitado() {
 function atualizarControlesAssistente(estado) {
   const botaoPrincipal = document.getElementById("botaoMicrofone");
   const botaoPausar = document.getElementById("botaoPausarMicrofone");
+  const botaoFinalizar = document.getElementById("botaoFinalizarMicrofone");
   const botaoCancelar = document.getElementById("botaoCancelarMicrofone");
   const ouvindo = estado === "ouvindo";
   const pausado = estado === "pausado";
@@ -619,18 +680,22 @@ function atualizarControlesAssistente(estado) {
     ? "<span>●</span> Ouvindo..."
     : pausado ? "<span>●</span> Continuar" : "<span>●</span> Começar";
   botaoPausar.classList.toggle("hidden", !ouvindo);
+  botaoFinalizar.classList.toggle("hidden", !ouvindo && !pausado);
   botaoCancelar.classList.toggle("hidden", estado === "parado" && !document.getElementById("comandoAssistente").value.trim());
 }
 
-function iniciarOuContinuarEscuta() {
+async function iniciarOuContinuarEscuta() {
   const ReconhecimentoVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!ReconhecimentoVoz) {
     definirStatusAssistente("O clique funcionou, mas este navegador não possui transcrição por voz. No computador, use Chrome ou Edge atualizado; o campo de texto continua disponível.", "error");
     return;
   }
 
+  if (!permissaoMicrofoneConcedida && !(await solicitarPermissaoMicrofone())) return;
+
   if (reconhecimentoAssistente) return;
   cancelamentoAssistente = false;
+  finalizacaoAssistentePendente = false;
   escutaAssistenteAtiva = true;
   escutaAssistentePausada = false;
   trechoFinalSessao = "";
@@ -656,6 +721,10 @@ function iniciarOuContinuarEscuta() {
     if (evento.error === "no-speech" || evento.error === "aborted") return;
     escutaAssistenteAtiva = false;
     escutaAssistentePausada = false;
+    if (evento.error === "not-allowed") {
+      permissaoMicrofoneConcedida = false;
+      abrirPermissaoMicrofone(true);
+    }
     definirStatusAssistente(evento.error === "not-allowed"
       ? "O acesso ao microfone foi bloqueado. Libere o microfone nas permissões do navegador e tente novamente."
       : "Não consegui usar o microfone. Você pode tentar novamente ou digitar a frase.", "error");
@@ -663,9 +732,15 @@ function iniciarOuContinuarEscuta() {
 
   reconhecimentoAssistente.onend = () => {
     transcricaoAssistente = `${transcricaoAssistente} ${trechoFinalSessao}`.replace(/\s+/g, " ").trim();
+    document.getElementById("comandoAssistente").value = transcricaoAssistente;
     trechoFinalSessao = "";
     reconhecimentoAssistente = null;
     if (cancelamentoAssistente) { atualizarControlesAssistente("parado"); return; }
+    if (finalizacaoAssistentePendente) {
+      finalizacaoAssistentePendente = false;
+      concluirFinalizacaoAssistente();
+      return;
+    }
     if (escutaAssistenteAtiva && !escutaAssistentePausada) {
       setTimeout(iniciarOuContinuarEscuta, 250);
       return;
@@ -691,8 +766,31 @@ function pausarEscutaAssistente() {
   definirStatusAssistente("Áudio pausado. Confira o texto, continue falando ou clique em “Interpretar antes de enviar”.");
 }
 
+function concluirFinalizacaoAssistente() {
+  const comando = document.getElementById("comandoAssistente").value.trim();
+  atualizarControlesAssistente("parado");
+  if (!comando) {
+    definirStatusAssistente("Não encontrei nenhuma fala para interpretar. Tente gravar novamente.", "error");
+    return;
+  }
+  interpretarLancamento(comando);
+}
+
+function finalizarEscutaAssistente() {
+  escutaAssistenteAtiva = false;
+  escutaAssistentePausada = false;
+  finalizacaoAssistentePendente = true;
+  definirStatusAssistente("Finalizando o áudio e interpretando sua fala...");
+  if (reconhecimentoAssistente) reconhecimentoAssistente.stop();
+  else {
+    finalizacaoAssistentePendente = false;
+    concluirFinalizacaoAssistente();
+  }
+}
+
 function cancelarEscutaAssistente() {
   cancelamentoAssistente = true;
+  finalizacaoAssistentePendente = false;
   escutaAssistenteAtiva = false;
   escutaAssistentePausada = false;
   reconhecimentoAssistente?.abort();
@@ -708,6 +806,7 @@ function cancelarEscutaAssistente() {
 
 document.getElementById("botaoMicrofone").addEventListener("click", iniciarOuContinuarEscuta);
 document.getElementById("botaoPausarMicrofone").addEventListener("click", pausarEscutaAssistente);
+document.getElementById("botaoFinalizarMicrofone").addEventListener("click", finalizarEscutaAssistente);
 document.getElementById("botaoCancelarMicrofone").addEventListener("click", cancelarEscutaAssistente);
 document.getElementById("botaoInterpretarAssistente").addEventListener("click", interpretarComandoDigitado);
 document.getElementById("comandoAssistente").addEventListener("keydown", event => {

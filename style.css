@@ -781,6 +781,7 @@ span.flatpickr-weekday {
 .voice-controls button { width:auto; margin:0; cursor:pointer; touch-action:manipulation; pointer-events:auto; user-select:none; }
 .voice-controls button:disabled { cursor:default; opacity:.86; }
 .voice-control-button { padding:12px 15px; border-radius:999px; }
+.finish-button { color:white; background:linear-gradient(135deg,#059669,#10b981); }
 .mic-button span { display:inline-grid; place-items:center; width:25px; height:25px; margin-right:5px; border-radius:50%; color:#ef4444; background:#fff; font-size:.62rem; }
 .mic-button.listening { animation:micPulse 1.3s infinite; background:linear-gradient(135deg,#dc2626,#f97316); }
 @keyframes micPulse { 50% { box-shadow:0 0 0 10px rgba(239,68,68,.12); } }
@@ -789,6 +790,14 @@ span.flatpickr-weekday {
 .quick-entry-form { display:grid; grid-template-columns:.7fr .8fr 1fr 1.4fr 1fr auto; gap:10px; align-items:end; margin:0; padding:14px; border-radius:16px; background:rgba(255,255,255,.82); box-shadow:none; }
 .quick-entry-form>div { min-width:0; }.quick-entry-form label { font-size:.75rem; }.quick-entry-form input,.quick-entry-form select,.quick-entry-form button { width:100%; margin:0; }.quick-entry-form>button { width:auto; white-space:nowrap; }
 .privacy-note { display:block; margin-top:10px; color:#64748b; }
+.microphone-permission-modal { position:fixed; inset:0; z-index:10050; display:grid; place-items:center; padding:20px; background:rgba(2,6,23,.68); backdrop-filter:blur(5px); }
+.microphone-permission-modal.hidden { display:none !important; }
+.microphone-permission-card { width:min(100%,430px); padding:28px; border-radius:24px; text-align:center; background:white; box-shadow:0 28px 80px rgba(2,6,23,.35); }
+.microphone-permission-card h2 { margin:5px 0 10px; }.microphone-permission-card>p { color:#64748b; line-height:1.55; }
+.permission-icon { display:grid; place-items:center; width:62px; height:62px; margin:0 auto 14px; border-radius:50%; color:#ef4444; background:#dbeafe; border:8px solid #eff6ff; }
+.permission-help { margin:16px 0; padding:14px; border-radius:14px; text-align:left; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; }
+.permission-help p { margin:5px 0 0; font-size:.87rem; line-height:1.45; }
+.microphone-permission-card button { margin-top:9px; }
 .value.negative,.patrimonio-main>strong.negative,.patrimonio-metrics strong.negative { color:#fca5a5; }
 .patrimonio-main>strong.positive { color:#fff; }
 

@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
   <div class="container">
@@ -50,6 +50,7 @@
           <div class="voice-controls">
             <button id="botaoMicrofone" type="button" class="mic-button" aria-label="Iniciar ou continuar gravação"><span>●</span> Começar</button>
             <button id="botaoPausarMicrofone" type="button" class="secondary voice-control-button hidden" aria-label="Pausar gravação">Pausar</button>
+            <button id="botaoFinalizarMicrofone" type="button" class="finish-button voice-control-button hidden" aria-label="Terminar e interpretar gravação">Terminar</button>
             <button id="botaoCancelarMicrofone" type="button" class="danger voice-control-button hidden" aria-label="Cancelar gravação">Cancelar</button>
           </div>
         </div>
@@ -398,9 +399,24 @@
 
   </div>
 
+  <div id="modalPermissaoMicrofone" class="microphone-permission-modal hidden" role="dialog" aria-modal="true" aria-labelledby="tituloPermissaoMicrofone">
+    <div class="microphone-permission-card">
+      <div class="permission-icon">●</div>
+      <span class="eyebrow">Assistente por voz</span>
+      <h2 id="tituloPermissaoMicrofone">Permita o uso do microfone</h2>
+      <p>Para registrar gastos e ganhos falando, o navegador precisa da sua autorização. O site só escuta depois que você toca em “Começar”.</p>
+      <div id="instrucaoMicrofoneBloqueado" class="permission-help hidden">
+        <strong>O navegador já bloqueou o acesso.</strong>
+        <p>Abra o cadeado ou as configurações deste site, escolha <b>Microfone → Permitir</b> e atualize a página.</p>
+      </div>
+      <button id="botaoPermitirMicrofone" type="button">Permitir microfone</button>
+      <button id="botaoAgoraNaoMicrofone" type="button" class="secondary">Agora não</button>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=5"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>
