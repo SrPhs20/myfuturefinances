@@ -32,12 +32,13 @@ Deno.serve(async request => {
 
     if (action === "list") {
       const ids = Array.isArray(body.ids) ? [...new Set(body.ids.filter(uuidValido))].slice(0, 20) : [];
-      if (!ids.length) return json({ ok: true, contas: [] });
-
-      const { data: perfis, error: erroPerfis } = await admin
+      let consultaPerfis = admin
         .from("perfis")
-        .select("user_id,public_id,nome,avatar_url,pin_length")
-        .in("public_id", ids);
+        .select("user_id,public_id,nome,avatar_url,pin_length,show_on_home");
+      consultaPerfis = ids.length
+        ? consultaPerfis.or(`show_on_home.eq.true,public_id.in.(${ids.join(",")})`)
+        : consultaPerfis.eq("show_on_home", true);
+      const { data: perfis, error: erroPerfis } = await consultaPerfis;
       if (erroPerfis) throw erroPerfis;
 
       const userIds = (perfis || []).map(perfil => perfil.user_id);
@@ -60,9 +61,11 @@ Deno.serve(async request => {
         nome: perfil.nome,
         avatar_url: perfil.avatar_url,
         pin_length: perfil.pin_length,
+        show_on_home: perfil.show_on_home,
         saldo: saldos.get(perfil.user_id) || 0,
       }]));
-      return json({ ok: true, contas: ids.map(id => porId.get(id)).filter(Boolean) });
+      const idsOrdenados = [...ids, ...(perfis || []).filter(perfil => perfil.show_on_home).map(perfil => perfil.public_id)];
+      return json({ ok: true, contas: [...new Set(idsOrdenados)].map(id => porId.get(id)).filter(Boolean) });
     }
 
     if (action === "create") {

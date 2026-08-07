@@ -274,6 +274,7 @@ function cardContaHTML(conta) {
   const avatar = conta.avatar_url
     ? `<img src="${escaparHTML(conta.avatar_url)}" alt="Foto de ${nome}" />`
     : `<span>${escaparHTML(iniciaisDoPerfil(conta.nome))}</span>`;
+  const remover = conta.show_on_home ? "" : `<button class="forget-account" type="button" onclick="removerContaDesteAparelho('${id}', event)" aria-label="Remover ${nome} deste aparelho" title="Remover deste aparelho">×</button>`;
   return `<article class="account-profile">
     <button class="account-profile-main" type="button" onclick="selecionarConta('${id}')" aria-label="Entrar na conta de ${nome}">
       <span class="account-profile-avatar">${avatar}</span>
@@ -281,7 +282,7 @@ function cardContaHTML(conta) {
       <small>Saldo atual</small>
       <b>${formatarMoeda(conta.saldo)}</b>
     </button>
-    <button class="forget-account" type="button" onclick="removerContaDesteAparelho('${id}', event)" aria-label="Remover ${nome} deste aparelho" title="Remover deste aparelho">×</button>
+    ${remover}
   </article>`;
 }
 
@@ -289,11 +290,6 @@ async function carregarContasDoDispositivo() {
   const grade = document.getElementById("accountsGrid");
   const ids = idsContasLembradas();
   contasDispositivo = [];
-
-  if (!ids.length) {
-    grade.innerHTML = '<div class="chooser-empty"><span>R$</span><strong>Nenhuma conta neste aparelho</strong><p>Crie a primeira conta para começar.</p></div>';
-    return;
-  }
 
   grade.innerHTML = '<div class="accounts-loading"><span></span><p>Carregando contas…</p></div>';
   try {
