@@ -2,6 +2,7 @@ const SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYWZ5bHpucHJpYm1wdW1jZ3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzA1NzcsImV4cCI6MjA5NjcwNjU3N30.a1Tg7EAsusekhQ3gdUopSE4b0MDSbP-YQEiv3khQeI4";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const COLUNAS_PERFIL = "id,user_id,nome,avatar_url,created_at,updated_at,pin_length";
 
 let usuarioAtual = null;
 let lancamentos = [];
@@ -24,57 +25,88 @@ let editandoOrcamentoId = null;
 let editandoObjetivoId = null;
 let filtroCompromissos = "mes";
 let compromissosExpandidos = false;
+let validandoPin = false;
+let temporizadorBloqueioPin = null;
 
 const appContainer = document.querySelector(".container");
 appContainer.classList.add("hidden");
 
 document.body.insertAdjacentHTML("afterbegin", `
 <section id="authScreen" class="auth-screen">
+  <div class="money-orbit money-orbit-one" aria-hidden="true">R$</div>
+  <div class="money-orbit money-orbit-two" aria-hidden="true">+</div>
 
-  <div class="auth-card" id="loginBox">
+  <div class="profile-gate hidden" id="profileGate">
+    <div class="gate-brand"><span>R$</span><strong>Minhas Finanças</strong></div>
+    <p class="gate-kicker">Quem está cuidando do futuro hoje?</p>
 
-    <h1>Minhas Finanças</h1>
-    <p>Entre na sua conta</p>
-
-    <label>Email</label>
-    <input id="authEmail" type="email" placeholder="Seu email" />
-
-    <label>Senha</label>
-    <input id="authSenha" type="password" placeholder="Sua senha" />
-
-    <button onclick="entrar()">Entrar</button>
-
-    <button class="secondary" onclick="mostrarCadastro()">
-      Criar conta
+    <button id="gateAvatarButton" class="gate-avatar-button" type="button" onclick="abrirEntradaPin()" aria-label="Entrar no perfil">
+      <span class="gate-avatar-ring">
+        <img id="gateAvatar" class="hidden" alt="Foto do perfil" />
+        <span id="gateInitials" class="gate-initials">MF</span>
+      </span>
+      <span class="gate-enter-badge" aria-hidden="true">→</span>
     </button>
 
-    <p id="authMensagem"></p>
+    <h1 id="gateName">Meu perfil</h1>
+    <div class="gate-balance">
+      <span>Saldo atual</span>
+      <strong id="gateBalance">R$ 0,00</strong>
+      <small>Visível neste dispositivo</small>
+    </div>
+    <p id="gateHint" class="gate-hint">Toque na foto para entrar</p>
 
+    <div id="pinPanel" class="pin-panel hidden">
+      <label for="pinAcesso">Digite seu PIN</label>
+      <input id="pinAcesso" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" aria-describedby="pinMensagem" oninput="processarPin(this)" />
+      <div id="pinDots" class="pin-dots" aria-hidden="true"></div>
+      <p id="pinMensagem" class="pin-message" aria-live="polite">A entrada acontece automaticamente.</p>
+    </div>
+
+    <div id="pinSetup" class="pin-setup hidden">
+      <span class="setup-pill">Primeiro acesso</span>
+      <h2>Crie seu PIN</h2>
+      <p>Escolha de 4 a 8 números. Ele será pedido sempre que o aplicativo abrir.</p>
+      <label for="novoPinGate">Novo PIN</label>
+      <input id="novoPinGate" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="4 a 8 números" oninput="limitarCampoPin(this)" />
+      <label for="confirmarPinGate">Confirme o PIN</label>
+      <input id="confirmarPinGate" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="Repita os números" oninput="limitarCampoPin(this)" />
+      <button type="button" onclick="configurarPinInicial()">Criar PIN e entrar</button>
+      <p id="pinSetupMensagem" class="pin-message" aria-live="polite"></p>
+    </div>
+
+    <button class="gate-switch" type="button" onclick="sair()">Usar outra conta</button>
+  </div>
+
+  <div class="auth-card" id="loginBox">
+    <div class="auth-brand-mark">R$</div>
+    <span class="eyebrow">Acesso seguro</span>
+    <h1>Minhas Finanças</h1>
+    <p>Entre uma vez com sua conta. Depois, use apenas seu PIN neste dispositivo.</p>
+    <label for="authEmail">Email</label>
+    <input id="authEmail" type="email" autocomplete="email" placeholder="Seu email" />
+    <label for="authSenha">Senha</label>
+    <input id="authSenha" type="password" autocomplete="current-password" placeholder="Sua senha" />
+    <button onclick="entrar()">Entrar com minha conta</button>
+    <button class="secondary" onclick="mostrarCadastro()">Criar conta</button>
+    <p id="authMensagem" class="auth-message" aria-live="polite"></p>
   </div>
 
   <div class="auth-card hidden" id="cadastroBox">
-
+    <div class="auth-brand-mark">R$</div>
+    <span class="eyebrow">Seu primeiro passo</span>
     <h1>Criar conta</h1>
-
-    <label>Nome</label>
+    <p>Monte sua vida financeira em um espaço só seu.</p>
+    <label for="authNome">Nome</label>
     <input id="authNome" type="text" placeholder="Seu nome" />
-
-    <label>Email</label>
-    <input id="authEmailCadastro" type="email" placeholder="Seu email" />
-
-    <label>Senha</label>
-    <input id="authSenhaCadastro" type="password" placeholder="Sua senha" />
-
-    <button onclick="cadastrar()">
-      Criar conta
-    </button>
-
-    <button class="secondary" onclick="mostrarLogin()">
-      Voltar para login
-    </button>
-
+    <label for="authEmailCadastro">Email</label>
+    <input id="authEmailCadastro" type="email" autocomplete="email" placeholder="Seu email" />
+    <label for="authSenhaCadastro">Senha da conta</label>
+    <input id="authSenhaCadastro" type="password" autocomplete="new-password" placeholder="Sua senha" />
+    <button onclick="cadastrar()">Criar conta</button>
+    <button class="secondary" onclick="mostrarLogin()">Voltar para login</button>
+    <p id="authMensagemCadastro" class="auth-message" aria-live="polite"></p>
   </div>
-
 </section>
 `);
 
@@ -105,6 +137,16 @@ appContainer.insertAdjacentHTML("afterbegin", `
       <input id="perfilFoto" type="file" accept="image/*" />
 
       <img id="previewPerfil" class="profile-avatar-large hidden" />
+
+      <div class="profile-pin-settings">
+        <span class="eyebrow">Segurança do aplicativo</span>
+        <h3>Alterar PIN de acesso</h3>
+        <p>Deixe em branco para manter o PIN atual.</p>
+        <label for="perfilNovoPin">Novo PIN</label>
+        <input id="perfilNovoPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="4 a 8 números" oninput="limitarCampoPin(this)" />
+        <label for="perfilConfirmarPin">Confirme o novo PIN</label>
+        <input id="perfilConfirmarPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="Repita os números" oninput="limitarCampoPin(this)" />
+      </div>
 
       <button onclick="salvarPerfil()">Salvar perfil</button>
       <button class="danger" onclick="excluirPerfil()">Excluir perfil e dados</button>
@@ -172,6 +214,196 @@ function formatarData(data) {
 
 function mostrarMensagemAuth(texto) {
   document.getElementById("authMensagem").textContent = texto;
+  document.getElementById("authMensagemCadastro").textContent = texto;
+}
+
+function limitarCampoPin(campo) {
+  campo.value = campo.value.replace(/\D/g, "").slice(0, 8);
+}
+
+function saldoAtualDoPerfil() {
+  return lancamentos.reduce((saldo, item) => {
+    const valor = Number(item.valor) || 0;
+    return saldo + (item.tipo === "receita" ? valor : -valor);
+  }, 0);
+}
+
+function iniciaisDoPerfil(nome) {
+  const partes = String(nome || "MF").trim().split(/\s+/).filter(Boolean);
+  return (partes.length > 1 ? `${partes[0][0]}${partes.at(-1)[0]}` : partes[0]?.slice(0, 2) || "MF").toUpperCase();
+}
+
+function prepararTelaDoPerfil() {
+  const nome = perfilAtual?.nome || usuarioAtual?.email?.split("@")[0] || "Meu perfil";
+  const avatar = perfilAtual?.avatar_url || "";
+  const gateAvatar = document.getElementById("gateAvatar");
+  const gateInitials = document.getElementById("gateInitials");
+
+  document.getElementById("gateName").textContent = nome;
+  document.getElementById("gateBalance").textContent = formatarMoeda(saldoAtualDoPerfil());
+  gateInitials.textContent = iniciaisDoPerfil(nome);
+
+  if (avatar) {
+    gateAvatar.src = avatar;
+    gateAvatar.classList.remove("hidden");
+    gateInitials.classList.add("hidden");
+  } else {
+    gateAvatar.removeAttribute("src");
+    gateAvatar.classList.add("hidden");
+    gateInitials.classList.remove("hidden");
+  }
+
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("cadastroBox").classList.add("hidden");
+  document.getElementById("profileGate").classList.remove("hidden", "unlocking", "pin-error");
+  document.getElementById("pinPanel").classList.add("hidden");
+  document.getElementById("gateHint").classList.remove("hidden");
+  document.getElementById("pinMensagem").textContent = "A entrada acontece automaticamente.";
+  document.getElementById("pinAcesso").value = "";
+
+  const possuiPin = Number(perfilAtual?.pin_length) >= 4;
+  document.getElementById("pinSetup").classList.toggle("hidden", possuiPin);
+  document.getElementById("gateHint").textContent = possuiPin
+    ? "Toque na foto para entrar"
+    : "Crie um PIN para proteger este perfil";
+
+  atualizarPontosPin(0);
+  appContainer.classList.add("hidden");
+  authScreen.classList.remove("hidden");
+}
+
+function atualizarPontosPin(preenchidos) {
+  const quantidade = Math.max(4, Math.min(8, Number(perfilAtual?.pin_length) || 4));
+  document.getElementById("pinDots").innerHTML = Array.from({ length: quantidade }, (_, indice) =>
+    `<span class="${indice < preenchidos ? "filled" : ""}"></span>`
+  ).join("");
+}
+
+function abrirEntradaPin() {
+  if (Number(perfilAtual?.pin_length) < 4) {
+    document.getElementById("novoPinGate").focus();
+    return;
+  }
+
+  document.getElementById("gateHint").classList.add("hidden");
+  document.getElementById("pinPanel").classList.remove("hidden");
+  const campo = document.getElementById("pinAcesso");
+  campo.maxLength = Number(perfilAtual.pin_length);
+  campo.focus({ preventScroll: true });
+}
+
+async function processarPin(campo) {
+  limitarCampoPin(campo);
+  atualizarPontosPin(campo.value.length);
+
+  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
+  if (!validandoPin && tamanhoPin && campo.value.length === tamanhoPin) {
+    await validarPinDigitado(campo.value);
+  }
+}
+
+function iniciarContagemBloqueioPin(segundos) {
+  clearInterval(temporizadorBloqueioPin);
+  const campo = document.getElementById("pinAcesso");
+  const mensagem = document.getElementById("pinMensagem");
+  let restante = Math.max(1, Number(segundos) || 30);
+  campo.disabled = true;
+
+  const atualizar = () => {
+    mensagem.textContent = `Muitas tentativas. Tente novamente em ${restante}s.`;
+    restante -= 1;
+    if (restante < 0) {
+      clearInterval(temporizadorBloqueioPin);
+      campo.disabled = false;
+      campo.value = "";
+      atualizarPontosPin(0);
+      mensagem.textContent = "Digite seu PIN novamente.";
+      campo.focus();
+    }
+  };
+
+  atualizar();
+  temporizadorBloqueioPin = setInterval(atualizar, 1000);
+}
+
+async function validarPinDigitado(pin) {
+  validandoPin = true;
+  const campo = document.getElementById("pinAcesso");
+  const mensagem = document.getElementById("pinMensagem");
+  mensagem.textContent = "Verificando…";
+
+  const { data, error } = await supabaseClient.rpc("verificar_pin_acesso", { p_pin: pin });
+
+  if (error) {
+    validandoPin = false;
+    campo.value = "";
+    atualizarPontosPin(0);
+    mensagem.textContent = mensagemErro(error, "Não foi possível verificar o PIN.");
+    return;
+  }
+
+  if (data?.valido) {
+    desbloquearAplicativo();
+    return;
+  }
+
+  validandoPin = false;
+  campo.value = "";
+  atualizarPontosPin(0);
+
+  if (data?.bloqueado) {
+    iniciarContagemBloqueioPin(data.segundos);
+    return;
+  }
+
+  const gate = document.getElementById("profileGate");
+  gate.classList.remove("pin-error");
+  void gate.offsetWidth;
+  gate.classList.add("pin-error");
+  mensagem.textContent = `PIN incorreto. ${data?.tentativas_restantes ?? 0} tentativa(s) restante(s).`;
+  setTimeout(() => campo.focus(), 80);
+}
+
+async function configurarPinInicial() {
+  const pin = document.getElementById("novoPinGate").value;
+  const confirmacao = document.getElementById("confirmarPinGate").value;
+  const mensagem = document.getElementById("pinSetupMensagem");
+
+  if (!/^\d{4,8}$/.test(pin)) {
+    mensagem.textContent = "Escolha um PIN com 4 a 8 números.";
+    return;
+  }
+  if (pin !== confirmacao) {
+    mensagem.textContent = "Os dois PINs precisam ser iguais.";
+    return;
+  }
+
+  mensagem.textContent = "Protegendo seu perfil…";
+  const { data, error } = await supabaseClient.rpc("configurar_pin_acesso", { p_pin: pin });
+  if (error) {
+    mensagem.textContent = mensagemErro(error, "Não foi possível criar o PIN.");
+    return;
+  }
+
+  perfilAtual.pin_length = Number(data?.tamanho) || pin.length;
+  document.getElementById("novoPinGate").value = "";
+  document.getElementById("confirmarPinGate").value = "";
+  desbloquearAplicativo();
+}
+
+function desbloquearAplicativo() {
+  clearInterval(temporizadorBloqueioPin);
+  const gate = document.getElementById("profileGate");
+  gate.classList.add("unlocking");
+  document.activeElement?.blur();
+
+  setTimeout(() => {
+    authScreen.classList.add("hidden");
+    gate.classList.remove("unlocking");
+    appContainer.classList.remove("hidden");
+    validandoPin = false;
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, 720);
 }
 
 async function cadastrar() {
@@ -232,18 +464,28 @@ async function entrar() {
   }
 
   usuarioAtual = data.user;
-  await iniciarApp();
+  mostrarMensagemAuth("Preparando seu perfil…");
+  await iniciarApp({ bloquear: true });
 }
 
 async function sair() {
+  clearInterval(temporizadorBloqueioPin);
   await supabaseClient.auth.signOut();
   usuarioAtual = null;
   perfilAtual = null;
   lancamentos = [];
   contasFixas = [];
   cartoesParcelados = [];
+  orcamentos = [];
+  objetivosFinanceiros = [];
+  metasMensais = [];
   metaMensal = 0;
   appContainer.classList.add("hidden");
+  document.getElementById("profileGate").classList.add("hidden");
+  document.getElementById("cadastroBox").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+  document.getElementById("authSenha").value = "";
+  mostrarMensagemAuth("");
   authScreen.classList.remove("hidden");
 }
 
@@ -253,17 +495,16 @@ async function verificarSessao() {
   if (data.session) {
     document.getElementById("modalPerfil").classList.add("hidden");
     usuarioAtual = data.session.user;
-    await iniciarApp();
+    await iniciarApp({ bloquear: true });
   } else {
     appContainer.classList.add("hidden");
     authScreen.classList.remove("hidden");
   }
 }
 
-async function iniciarApp() {
+async function iniciarApp({ bloquear = true } = {}) {
   try {
-    authScreen.classList.add("hidden");
-    appContainer.classList.remove("hidden");
+    appContainer.classList.add("hidden");
 
     await carregarPerfil();
     await carregarDados();
@@ -271,6 +512,8 @@ async function iniciarApp() {
     configurarCalendarios();
     atualizarTudo();
     fecharPerfil();
+    if (bloquear) prepararTelaDoPerfil();
+    else desbloquearAplicativo();
   } catch (error) {
     appContainer.classList.add("hidden");
     authScreen.classList.remove("hidden");
@@ -1235,7 +1478,7 @@ function prepararImagemPerfil(arquivo) {
 async function carregarPerfil() {
   const { data, error } = await supabaseClient
     .from("perfis")
-    .select("*")
+    .select(COLUNAS_PERFIL)
     .eq("user_id", usuarioAtual.id)
     .maybeSingle();
 
@@ -1246,7 +1489,7 @@ async function carregarPerfil() {
     const { data: perfilCriado, error: erroCriacao } = await supabaseClient
       .from("perfis")
       .insert([{ user_id: usuarioAtual.id, nome: nomeInicial, avatar_url: "" }])
-      .select()
+      .select(COLUNAS_PERFIL)
       .single();
     if (erroCriacao) throw erroCriacao;
     perfilAtual = perfilCriado;
@@ -1273,6 +1516,8 @@ function abrirPerfil() {
   document.getElementById("modalPerfil").classList.remove("hidden");
 
   document.getElementById("perfilNome").value = perfilAtual?.nome || "";
+  document.getElementById("perfilNovoPin").value = "";
+  document.getElementById("perfilConfirmarPin").value = "";
 
   const preview = document.getElementById("previewPerfil");
 
@@ -1291,9 +1536,21 @@ function fecharPerfil() {
 async function salvarPerfil() {
 
   const nome = document.getElementById("perfilNome").value.trim();
+  const novoPin = document.getElementById("perfilNovoPin").value;
+  const confirmarNovoPin = document.getElementById("perfilConfirmarPin").value;
 
   if (!nome) {
     alert("Digite seu nome.");
+    return;
+  }
+
+  if (novoPin && !/^\d{4,8}$/.test(novoPin)) {
+    alert("O novo PIN deve ter entre 4 e 8 números.");
+    return;
+  }
+
+  if (novoPin !== confirmarNovoPin) {
+    alert("A confirmação do novo PIN está diferente.");
     return;
   }
 
@@ -1363,6 +1620,14 @@ async function salvarPerfil() {
     return;
   }
 
+  if (novoPin) {
+    const { error: erroPin } = await supabaseClient.rpc("configurar_pin_acesso", { p_pin: novoPin });
+    if (erroPin) {
+      alert(mensagemErro(erroPin, "O perfil foi salvo, mas não foi possível alterar o PIN."));
+      return;
+    }
+  }
+
   await carregarPerfil();
 
   fecharPerfil();
@@ -1388,7 +1653,11 @@ async function excluirPerfil() {
 
   await supabaseClient.auth.signOut({ scope: "local" });
   usuarioAtual = null;
+  perfilAtual = null;
   appContainer.classList.add("hidden");
+  document.getElementById("profileGate").classList.add("hidden");
+  document.getElementById("cadastroBox").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
   authScreen.classList.remove("hidden");
 
   alert("Sua conta e seus dados foram excluídos.");

@@ -1112,3 +1112,233 @@ tbody tr:hover { background: #f4f8f3; }
   .month-control input { min-width: 0; }
   .commitment-actions .small-button { width: 100%; }
 }
+
+/* Entrada por perfil e PIN */
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  min-height: 100dvh;
+  padding: 28px;
+  overflow: auto;
+  isolation: isolate;
+  color: #fff;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(57, 159, 107, .26), transparent 26rem),
+    radial-gradient(circle at 12% 86%, rgba(201, 155, 67, .13), transparent 22rem),
+    linear-gradient(145deg, #071b13 0%, #0b2b1e 48%, #123d2b 100%);
+}
+
+.auth-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: .16;
+  background-image: radial-gradient(rgba(255, 255, 255, .45) .7px, transparent .7px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(to bottom, #000, transparent 85%);
+}
+
+.money-orbit {
+  position: fixed;
+  z-index: -1;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, .055);
+  font-family: Georgia, serif;
+  font-weight: 800;
+  animation: orbitFloat 9s ease-in-out infinite;
+}
+.money-orbit-one { top: -90px; right: -70px; width: 330px; height: 330px; font-size: 5rem; }
+.money-orbit-two { bottom: -120px; left: -80px; width: 290px; height: 290px; font-size: 7rem; animation-delay: -4s; }
+
+.auth-card {
+  position: relative;
+  width: min(100%, 430px);
+  margin: auto;
+  padding: 30px;
+  gap: 10px;
+  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, .32);
+  border-radius: 26px;
+  background: rgba(255, 253, 247, .96);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .28);
+  animation: gateAppear .55s cubic-bezier(.2, .8, .2, 1);
+}
+.auth-card h1 { margin: 0 0 2px; color: var(--forest-950); letter-spacing: -.04em; }
+.auth-card p { margin: 0 0 8px; line-height: 1.45; }
+.auth-card .eyebrow { margin: 4px 0 -4px; }
+.auth-brand-mark {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+  border-radius: 16px;
+  color: #fff;
+  font-family: Georgia, serif;
+  font-weight: 800;
+  background: linear-gradient(145deg, var(--emerald-500), var(--forest-900));
+  box-shadow: 0 10px 24px rgba(18, 61, 43, .2);
+}
+.auth-message { min-height: 20px; margin: 2px 0 0 !important; color: var(--danger) !important; font-size: .82rem; font-weight: 700; }
+
+.profile-gate {
+  width: min(100%, 560px);
+  margin: auto;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  animation: gateAppear .65s cubic-bezier(.2, .8, .2, 1);
+}
+
+.gate-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 34px; color: rgba(255, 255, 255, .88); }
+.gate-brand span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--forest-950);
+  font-family: Georgia, serif;
+  font-size: .78rem;
+  font-weight: 900;
+  background: linear-gradient(145deg, #dff1e4, #9fd0ae);
+}
+.gate-brand strong { font-size: .92rem; letter-spacing: .01em; }
+.gate-kicker { margin: 0 0 22px; color: #bdd4c6; font-size: .82rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+
+.gate-avatar-button {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  min-height: 0;
+  margin: 0 0 20px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  transform-origin: center;
+}
+.gate-avatar-button:hover { background: transparent; box-shadow: none; transform: scale(1.035); }
+.gate-avatar-button:focus-visible { outline: 3px solid #b9e4c7; outline-offset: 7px; }
+.gate-avatar-ring {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 4px solid rgba(230, 245, 234, .86);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #3aa872, #153e2d);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, .38), 0 0 0 9px rgba(255, 255, 255, .045);
+}
+.gate-avatar-ring img { width: 100%; height: 100%; object-fit: cover; }
+.gate-initials { color: #fff; font-family: Georgia, serif; font-size: 3.2rem; font-weight: 800; letter-spacing: -.08em; }
+.gate-enter-badge {
+  position: absolute;
+  right: 5px;
+  bottom: 9px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--forest-950);
+  border-radius: 50%;
+  color: var(--forest-950);
+  background: #d8efdf;
+  box-shadow: 0 7px 18px rgba(0, 0, 0, .24);
+}
+
+.profile-gate > h1 { margin: 0; color: #fff; font-size: clamp(1.7rem, 5vw, 2.2rem); letter-spacing: -.04em; }
+.gate-balance { margin-top: 10px; }
+.gate-balance span, .gate-balance small { display: block; color: #9db9a8; }
+.gate-balance span { font-size: .76rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.gate-balance strong { display: block; margin: 4px 0; color: #e8f7ec; font-size: clamp(1.65rem, 6vw, 2.35rem); letter-spacing: -.045em; }
+.gate-balance small { font-size: .7rem; }
+.gate-hint { margin: 20px 0 0; color: #c2d8ca; font-size: .84rem; animation: softPulse 2.4s ease-in-out infinite; }
+
+.pin-panel, .pin-setup { width: min(100%, 380px); }
+.pin-panel { position: relative; margin-top: 24px; }
+.pin-panel label { color: #d8e9dd; }
+.pin-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  opacity: .01;
+  pointer-events: none;
+}
+.pin-dots { min-height: 24px; display: flex; justify-content: center; gap: 12px; margin: 18px 0 12px; }
+.pin-dots span {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(215, 237, 222, .48);
+  border-radius: 50%;
+  transition: transform .18s ease, background .18s ease, border-color .18s ease;
+}
+.pin-dots span.filled { border-color: #b9e4c7; background: #b9e4c7; transform: scale(1.12); }
+.pin-message { min-height: 20px; margin: 0; color: #a8c4b2; font-size: .78rem; }
+
+.pin-setup {
+  margin-top: 24px;
+  padding: 22px;
+  display: grid;
+  gap: 9px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .075);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .06);
+}
+.pin-setup h2 { margin: 0; color: #fff; }
+.pin-setup p { margin: 0 0 5px; color: #afc8b8; font-size: .82rem; line-height: 1.45; }
+.pin-setup label { color: #dbe9df; }
+.pin-setup input { border-color: rgba(255, 255, 255, .16); color: #fff; background: rgba(4, 25, 17, .42); }
+.pin-setup input::placeholder { color: #819e8d; }
+.pin-setup button { width: 100%; margin-top: 5px; color: var(--forest-950); background: linear-gradient(135deg, #d9efdf, #a6d7b4); box-shadow: 0 10px 28px rgba(0, 0, 0, .18); }
+.setup-pill { width: fit-content; padding: 5px 9px; border-radius: 999px; color: #d9efdf; background: rgba(157, 215, 174, .14); font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.gate-switch { margin-top: 25px; padding: 7px 10px; min-height: 34px; border: 0; color: #91ad9b; background: transparent; box-shadow: none; font-size: .78rem; }
+.gate-switch:hover { color: #fff; background: rgba(255, 255, 255, .06); box-shadow: none; transform: none; }
+
+.profile-pin-settings { margin: 7px 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--mint-50); }
+.profile-pin-settings h3 { margin: 0 0 4px; color: var(--forest-900); }
+.profile-pin-settings p { margin: 0 0 10px; color: var(--muted); font-size: .78rem; }
+.profile-pin-settings input { margin-bottom: 8px; }
+
+.profile-gate.pin-error .gate-avatar-button { animation: pinShake .38s ease; }
+.profile-gate.unlocking > *:not(.gate-avatar-button) { animation: gateFade .38s ease forwards; }
+.profile-gate.unlocking .gate-avatar-button { z-index: 4; animation: profileZoom .72s cubic-bezier(.65, 0, .35, 1) forwards; }
+
+@keyframes gateAppear { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes orbitFloat { 0%, 100% { transform: translate3d(0, 0, 0) rotate(-5deg); } 50% { transform: translate3d(0, -16px, 0) rotate(4deg); } }
+@keyframes softPulse { 0%, 100% { opacity: .62; } 50% { opacity: 1; } }
+@keyframes pinShake { 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+@keyframes gateFade { to { opacity: 0; transform: scale(.96); } }
+@keyframes profileZoom {
+  0% { transform: scale(1); opacity: 1; }
+  58% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(8); opacity: 0; }
+}
+
+@media (max-width: 600px) {
+  .auth-screen { padding: 18px; }
+  .auth-card { padding: 24px 20px; border-radius: 22px; }
+  .gate-brand { margin-bottom: 25px; }
+  .gate-kicker { margin-bottom: 19px; font-size: .7rem; }
+  .gate-avatar-button { width: 148px; height: 148px; margin-bottom: 17px; }
+  .gate-initials { font-size: 2.7rem; }
+  .gate-enter-badge { width: 36px; height: 36px; }
+  .pin-setup { padding: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .money-orbit, .gate-hint { animation: none; }
+  .profile-gate.unlocking .gate-avatar-button { animation-duration: .15s; }
+}
