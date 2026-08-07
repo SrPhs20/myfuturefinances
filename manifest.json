@@ -5,8 +5,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f4f6f8",
-  "theme_color": "#2563eb",
+  "background_color": "#f4f1e8",
+  "theme_color": "#123d2b",
   "description": "Controle pessoal de receitas, despesas, contas fixas e cartões.",
   "icons": [
     {
