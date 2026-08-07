@@ -39,7 +39,7 @@ document.body.insertAdjacentHTML("afterbegin", `
   <div class="money-orbit money-orbit-one" aria-hidden="true">R$</div>
   <div class="money-orbit money-orbit-two" aria-hidden="true">+</div>
 
-  <div class="account-chooser" id="accountChooser">
+  <div class="account-chooser hidden" id="accountChooser">
     <div class="gate-brand"><span>R$</span><strong>Minhas Finanças</strong></div>
     <span class="chooser-eyebrow">Seu dinheiro. Suas escolhas.</span>
     <h1>Quem vai entrar?</h1>
