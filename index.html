@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=12" />
+  <link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body>
   <div class="container">
@@ -253,30 +253,89 @@
         </div>
       </div>
 
-      <form id="formContaFixa">
-        <label>Nome da conta</label>
-        <input id="nomeConta" type="text" placeholder="Ex. Aluguel, Internet, Academia, Faculdade" required />
+      <div class="fixed-workspace-tabs" role="tablist" aria-label="Organização das contas fixas">
+        <button type="button" class="fixed-workspace-tab active" id="tabPainelContas" onclick="mostrarPainelContasFixas('contas')">Contas fixas</button>
+        <button type="button" class="fixed-workspace-tab" id="tabPainelGrupos" onclick="mostrarPainelContasFixas('grupos')">Meus grupos</button>
+      </div>
 
-        <label>Valor mensal</label>
-        <input id="valorConta" type="number" step="0.01" placeholder="Ex. 1200,00" required />
+      <div id="painelContasFixas">
+        <form id="formContaFixa" class="fixed-account-form">
+          <div class="form-field">
+            <label for="nomeConta">Nome da conta</label>
+            <input id="nomeConta" type="text" placeholder="Ex. Netflix, Faculdade, Aluguel" required />
+          </div>
 
-        <label>Data de vencimento</label>
-        <input id="dataVencimentoConta" type="date" required />
+          <div class="form-field">
+            <label for="valorConta">Valor mensal</label>
+            <input id="valorConta" type="number" step="0.01" placeholder="Ex. 59,90" required />
+          </div>
 
-        <button id="botaoContaFixa" type="submit">Adicionar conta fixa</button>
+          <div class="form-field">
+            <label for="dataVencimentoConta">Data de vencimento</label>
+            <input id="dataVencimentoConta" type="date" required />
+          </div>
 
-<button
-  type="button"
-  class="secondary hidden"
-  id="cancelarEdicaoContaFixa"
->
-  Cancelar edição
-</button>
-      </form>
+          <div class="form-field">
+            <label for="grupoConta">Grupo <span class="optional-label">opcional</span></label>
+            <select id="grupoConta">
+              <option value="">Sem grupo</option>
+            </select>
+          </div>
 
-      <div class="chart">
-        <h2>Minhas contas fixas</h2>
-        <div id="listaContasFixas"></div>
+          <div class="fixed-form-actions">
+            <button id="botaoContaFixa" type="submit">Adicionar conta fixa</button>
+            <button type="button" class="secondary hidden" id="cancelarEdicaoContaFixa">Cancelar edição</button>
+          </div>
+        </form>
+
+        <div class="chart fixed-accounts-chart">
+          <div class="fixed-list-heading">
+            <div>
+              <span class="eyebrow">Visão mensal</span>
+              <h2>Minhas contas fixas</h2>
+            </div>
+            <div class="group-filter-control">
+              <label for="filtroGrupoConta">Filtrar por grupo</label>
+              <select id="filtroGrupoConta" onchange="atualizarContasFixas()">
+                <option value="todos">Todos os grupos</option>
+                <option value="sem_grupo">Sem grupo</option>
+              </select>
+            </div>
+          </div>
+          <div class="filtered-group-total">
+            <span id="rotuloTotalGrupo">Total de todas as contas</span>
+            <strong id="totalGrupoFiltrado">R$ 0,00</strong>
+          </div>
+          <div id="listaContasFixas"></div>
+        </div>
+      </div>
+
+      <div id="painelGruposContas" class="hidden">
+        <form id="formGrupoConta" class="group-create-form">
+          <div>
+            <span class="eyebrow">Organize do seu jeito</span>
+            <h2>Criar um novo grupo</h2>
+            <p>Crie grupos como Streaming, Estudos, Moradia ou qualquer outro que faça sentido para você.</p>
+          </div>
+          <div class="group-create-fields">
+            <div class="form-field">
+              <label for="nomeGrupoConta">Nome do grupo</label>
+              <input id="nomeGrupoConta" type="text" maxlength="40" placeholder="Ex. Streaming" required />
+            </div>
+            <button type="submit">Criar grupo</button>
+          </div>
+        </form>
+
+        <div class="chart groups-chart">
+          <div class="fixed-list-heading">
+            <div>
+              <span class="eyebrow">Categorias reutilizáveis</span>
+              <h2>Meus grupos</h2>
+            </div>
+            <span class="soft-pill" id="resumoGruposContas">0 grupos</span>
+          </div>
+          <div id="listaGruposContas" class="groups-grid"></div>
+        </div>
       </div>
     </section>
 
@@ -384,6 +443,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=12"></script>
+  <script src="script.js?v=13"></script>
 </body>
 </html>

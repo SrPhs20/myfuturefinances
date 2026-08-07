@@ -8,6 +8,7 @@ const CONTAS_DISPOSITIVO_KEY = "myfuturefinances:contas:v1";
 let usuarioAtual = null;
 let lancamentos = [];
 let contasFixas = [];
+let gruposContas = [];
 let metaMensal = 0;
 let metasMensais = [];
 let perfilAtual = null;
@@ -687,7 +688,7 @@ async function iniciarApp({ bloquear = true } = {}) {
   }
 }
 async function carregarDados() {
-  const [resLancamentos, resContas, resMetas, resCartoes, resOrcamentos, resObjetivos] = await Promise.all([
+  const [resLancamentos, resContas, resGruposContas, resMetas, resCartoes, resOrcamentos, resObjetivos] = await Promise.all([
     supabaseClient
       .from("lancamentos")
       .select("*")
@@ -698,6 +699,11 @@ async function carregarDados() {
       .select("*")
       .eq("user_id", usuarioAtual.id)
       .order("vencimento", { ascending: true }),
+    supabaseClient
+      .from("grupos_contas")
+      .select("*")
+      .eq("user_id", usuarioAtual.id)
+      .order("nome", { ascending: true }),
     supabaseClient
       .from("metas")
       .select("*")
@@ -717,13 +723,14 @@ async function carregarDados() {
       .order("created_at", { ascending: false })
   ]);
 
-  const erro = resLancamentos.error || resContas.error || resMetas.error || resCartoes.error || resOrcamentos.error || resObjetivos.error;
+  const erro = resLancamentos.error || resContas.error || resGruposContas.error || resMetas.error || resCartoes.error || resOrcamentos.error || resObjetivos.error;
   if (erro) {
     throw new Error(mensagemErro(erro, "Não foi possível carregar seus dados."));
   }
 
   lancamentos = resLancamentos.data || [];
   contasFixas = resContas.data || [];
+  gruposContas = resGruposContas.data || [];
   metasMensais = resMetas.data || [];
   metaMensal = Number(metasMensais.find(meta => meta.mes === primeiroDiaMesAtual())?.valor || 0);
   cartoesParcelados = resCartoes.data || [];
@@ -962,6 +969,9 @@ formContaFixa.addEventListener("submit", async function(e) {
     nome: document.getElementById("nomeConta").value.trim(),
     valor: Number(document.getElementById("valorConta").value),
     vencimento: document.getElementById("dataVencimentoConta").value || hojeTexto(),
+    grupo_id: document.getElementById("grupoConta").value
+      ? Number(document.getElementById("grupoConta").value)
+      : null,
     user_id: usuarioAtual.id
   };
 
@@ -1052,17 +1062,33 @@ function atualizarContasFixas() {
   const listaContas = document.getElementById("listaContasFixas");
   listaContas.innerHTML = "";
 
-  let totalFixas = 0;
+  atualizarOpcoesGruposContas();
+
+  const filtroGrupo = document.getElementById("filtroGrupoConta")?.value || "todos";
+  const contasFiltradas = contasFixas.filter(conta => {
+    if (filtroGrupo === "todos") return true;
+    if (filtroGrupo === "sem_grupo") return !conta.grupo_id;
+    return Number(conta.grupo_id) === Number(filtroGrupo);
+  });
+
+  let totalFixas = contasFixas.reduce((total, conta) => total + Number(conta.valor), 0);
   let totalAbertas = 0;
   let totalVencidas = 0;
 
   const hoje = hojeTexto();
 
+  contasFixas.forEach(conta => {
+    totalAbertas += Number(conta.valor);
+    if (conta.vencimento < hoje) totalVencidas += Number(conta.valor);
+  });
+
   if (contasFixas.length === 0) {
-    listaContas.innerHTML = "<p>Nenhuma conta fixa cadastrada ainda.</p>";
+    listaContas.innerHTML = '<p class="empty-state">Nenhuma conta fixa cadastrada ainda.</p>';
+  } else if (contasFiltradas.length === 0) {
+    listaContas.innerHTML = '<p class="empty-state">Nenhuma conta encontrada neste grupo.</p>';
   }
 
-  const contasOrdenadas = [...contasFixas]
+  const contasOrdenadas = [...contasFiltradas]
     .map(conta => {
       let prioridade = 2;
 
@@ -1077,23 +1103,18 @@ function atualizarContasFixas() {
     });
 
   contasOrdenadas.forEach(conta => {
-    totalFixas += Number(conta.valor);
-
     let status = "Em aberto";
     let classeStatus = "status-open";
 
     if (conta.vencimento < hoje) {
       status = "Vencida";
       classeStatus = "status-late";
-      totalVencidas += Number(conta.valor);
-      totalAbertas += Number(conta.valor);
     } else if (conta.vencimento === hoje) {
       status = "Vence hoje";
       classeStatus = "status-today";
-      totalAbertas += Number(conta.valor);
-    } else {
-      totalAbertas += Number(conta.valor);
     }
+
+    const grupo = gruposContas.find(item => Number(item.id) === Number(conta.grupo_id));
 
     const div = document.createElement("div");
 
@@ -1110,7 +1131,10 @@ div.className = contaEhDoMesAtual
       <div>
         <strong>${escaparHTML(conta.nome)}</strong>
         <p>${formatarMoeda(conta.valor)} • Vencimento: ${formatarData(conta.vencimento)}</p>
-        <span class="status ${classeStatus}">${status}</span>
+        <div class="bill-tags">
+          <span class="status ${classeStatus}">${status}</span>
+          <span class="group-badge ${grupo ? "" : "group-badge-empty"}">${grupo ? escaparHTML(grupo.nome) : "Sem grupo"}</span>
+        </div>
       </div>
 
     <div class="bill-actions">
@@ -1126,6 +1150,109 @@ div.className = contaEhDoMesAtual
   document.getElementById("totalFixas").textContent = formatarMoeda(totalFixas);
   document.getElementById("totalFixasAbertas").textContent = formatarMoeda(totalAbertas);
   document.getElementById("totalFixasVencidas").textContent = formatarMoeda(totalVencidas);
+  document.getElementById("totalGrupoFiltrado").textContent = formatarMoeda(
+    contasFiltradas.reduce((total, conta) => total + Number(conta.valor), 0)
+  );
+
+  const grupoSelecionado = gruposContas.find(item => String(item.id) === filtroGrupo);
+  document.getElementById("rotuloTotalGrupo").textContent = filtroGrupo === "todos"
+    ? "Total de todas as contas"
+    : filtroGrupo === "sem_grupo"
+      ? "Total sem grupo"
+      : `Total de ${grupoSelecionado?.nome || "grupo"}`;
+}
+
+function atualizarOpcoesGruposContas() {
+  const seletorConta = document.getElementById("grupoConta");
+  const seletorFiltro = document.getElementById("filtroGrupoConta");
+  if (!seletorConta || !seletorFiltro) return;
+
+  const grupoContaAtual = seletorConta.value;
+  const filtroAtual = seletorFiltro.value || "todos";
+  const opcoes = gruposContas.map(grupo =>
+    `<option value="${grupo.id}">${escaparHTML(grupo.nome)}</option>`
+  ).join("");
+
+  seletorConta.innerHTML = `<option value="">Sem grupo</option>${opcoes}`;
+  seletorFiltro.innerHTML = `<option value="todos">Todos os grupos</option><option value="sem_grupo">Sem grupo</option>${opcoes}`;
+
+  seletorConta.value = gruposContas.some(grupo => String(grupo.id) === grupoContaAtual) ? grupoContaAtual : "";
+  seletorFiltro.value = filtroAtual === "todos" || filtroAtual === "sem_grupo" || gruposContas.some(grupo => String(grupo.id) === filtroAtual)
+    ? filtroAtual
+    : "todos";
+}
+
+function mostrarPainelContasFixas(painel) {
+  const exibindoGrupos = painel === "grupos";
+  document.getElementById("painelContasFixas").classList.toggle("hidden", exibindoGrupos);
+  document.getElementById("painelGruposContas").classList.toggle("hidden", !exibindoGrupos);
+  document.getElementById("tabPainelContas").classList.toggle("active", !exibindoGrupos);
+  document.getElementById("tabPainelGrupos").classList.toggle("active", exibindoGrupos);
+  if (exibindoGrupos) atualizarGruposContas();
+}
+
+document.getElementById("formGrupoConta").addEventListener("submit", async function(event) {
+  event.preventDefault();
+  const nome = document.getElementById("nomeGrupoConta").value.trim();
+  if (!nome) return;
+
+  const { error } = await supabaseClient.from("grupos_contas").insert([{
+    user_id: usuarioAtual.id,
+    nome
+  }]);
+
+  if (error) {
+    alert(error.code === "23505" ? "Você já criou um grupo com esse nome." : mensagemErro(error, "Não foi possível criar o grupo."));
+    return;
+  }
+
+  this.reset();
+  await carregarDados();
+  atualizarTudo();
+  mostrarPainelContasFixas("grupos");
+});
+
+async function removerGrupoConta(id) {
+  const grupo = gruposContas.find(item => Number(item.id) === Number(id));
+  if (!grupo) return;
+  const quantidade = contasFixas.filter(conta => Number(conta.grupo_id) === Number(id)).length;
+  const detalhe = quantidade
+    ? `\n\n${quantidade} conta${quantidade === 1 ? "" : "s"} continuar${quantidade === 1 ? "á" : "ão"} existindo como \"Sem grupo\".`
+    : "";
+  if (!confirm(`Excluir o grupo \"${grupo.nome}\"?${detalhe}`)) return;
+
+  const { error } = await supabaseClient.from("grupos_contas").delete().eq("id", id).eq("user_id", usuarioAtual.id);
+  if (error) return alert(mensagemErro(error, "Não foi possível excluir o grupo."));
+
+  await carregarDados();
+  atualizarTudo();
+  mostrarPainelContasFixas("grupos");
+}
+
+function atualizarGruposContas() {
+  const lista = document.getElementById("listaGruposContas");
+  if (!lista) return;
+  document.getElementById("resumoGruposContas").textContent = `${gruposContas.length} grupo${gruposContas.length === 1 ? "" : "s"}`;
+
+  if (!gruposContas.length) {
+    lista.innerHTML = '<p class="empty-state">Nenhum grupo criado. Que tal começar por Streaming, Estudos ou Moradia?</p>';
+    return;
+  }
+
+  lista.innerHTML = gruposContas.map(grupo => {
+    const contasDoGrupo = contasFixas.filter(conta => Number(conta.grupo_id) === Number(grupo.id));
+    const total = contasDoGrupo.reduce((soma, conta) => soma + Number(conta.valor), 0);
+    return `
+      <article class="group-card">
+        <div class="group-card-icon">${escaparHTML(grupo.nome.slice(0, 1).toUpperCase())}</div>
+        <div class="group-card-copy">
+          <span>${contasDoGrupo.length} conta${contasDoGrupo.length === 1 ? "" : "s"}</span>
+          <h3>${escaparHTML(grupo.nome)}</h3>
+          <strong>${formatarMoeda(total)} <small>/ mês</small></strong>
+        </div>
+        <button type="button" class="group-delete-button" onclick="removerGrupoConta(${grupo.id})" aria-label="Excluir grupo ${escaparHTML(grupo.nome)}">Excluir</button>
+      </article>`;
+  }).join("");
 }
 
 function resumoDoMes(mes) {
@@ -1491,10 +1618,14 @@ async function limparTudo() {
 
 function exportarDados() {
   const dados = JSON.stringify({
-    versao: 3,
+    versao: 4,
     exportadoEm: new Date().toISOString(),
     lancamentos,
-    contasFixas,
+    contasFixas: contasFixas.map(conta => ({
+      ...conta,
+      grupo_nome: gruposContas.find(grupo => Number(grupo.id) === Number(conta.grupo_id))?.nome || null
+    })),
+    gruposContas,
     metaMensal,
     metasMensais,
     orcamentos,
@@ -1525,6 +1656,23 @@ async function importarDados(event) {
 
     if (!confirm("Os dados do arquivo serão adicionados à sua conta. Deseja continuar?")) return;
 
+    const nomesGruposBackup = [...new Set([
+      ...(dados.gruposContas || []).map(grupo => grupo.nome),
+      ...dados.contasFixas.map(conta => conta.grupo_nome)
+    ].filter(Boolean).map(nome => String(nome).trim()).filter(Boolean))];
+    const nomesExistentes = new Set(gruposContas.map(grupo => grupo.nome.trim().toLocaleLowerCase("pt-BR")));
+    const gruposNovos = nomesGruposBackup
+      .filter(nome => !nomesExistentes.has(nome.toLocaleLowerCase("pt-BR")))
+      .map(nome => ({ user_id: usuarioAtual.id, nome }));
+
+    let gruposDisponiveis = [...gruposContas];
+    if (gruposNovos.length) {
+      const respostaGrupos = await supabaseClient.from("grupos_contas").insert(gruposNovos).select("*");
+      if (respostaGrupos.error) throw respostaGrupos.error;
+      gruposDisponiveis = [...gruposDisponiveis, ...(respostaGrupos.data || [])];
+    }
+    const idGrupoPorNome = new Map(gruposDisponiveis.map(grupo => [grupo.nome.trim().toLocaleLowerCase("pt-BR"), grupo.id]));
+
     const novosLancamentos = dados.lancamentos.map(({ tipo, categoria, descricao, valor, data, origem, origem_id }) => ({
       tipo,
       categoria,
@@ -1536,10 +1684,11 @@ async function importarDados(event) {
       user_id: usuarioAtual.id
     }));
 
-    const novasContas = dados.contasFixas.map(({ nome, valor, vencimento }) => ({
-      nome,
-      valor: Number(valor),
-      vencimento,
+    const novasContas = dados.contasFixas.map(item => ({
+      nome: item.nome,
+      valor: Number(item.valor),
+      vencimento: item.vencimento,
+      grupo_id: item.grupo_nome ? idGrupoPorNome.get(String(item.grupo_nome).trim().toLocaleLowerCase("pt-BR")) || null : null,
       user_id: usuarioAtual.id
     }));
 
@@ -2198,6 +2347,7 @@ function parcelasCartaoDoMesAtual() {
 
 function limparFormularioContaFixa() {
   formContaFixa.reset();
+  document.getElementById("grupoConta").value = "";
 
   if (calendarioVencimento) {
     calendarioVencimento.setDate(hojeTexto(), true);
@@ -2223,6 +2373,7 @@ function editarContaFixa(id) {
 
   document.getElementById("nomeConta").value = conta.nome || "";
   document.getElementById("valorConta").value = conta.valor || "";
+  document.getElementById("grupoConta").value = conta.grupo_id || "";
 
   if (calendarioVencimento) {
     calendarioVencimento.setDate(conta.vencimento, true);
@@ -2373,6 +2524,7 @@ function atualizarPlanejamento() {
 function atualizarTudo() {
   atualizarTela();
   atualizarContasFixas();
+  atualizarGruposContas();
   atualizarCartoes();
   atualizarDashboard();
   atualizarPlanejamento();
