@@ -22,14 +22,8 @@ let calendarioCartaoPrimeiraParcela;
 let editandoContaFixaId = null;
 let editandoOrcamentoId = null;
 let editandoObjetivoId = null;
-let reconhecimentoAssistente = null;
-let transcricaoAssistente = "";
-let trechoFinalSessao = "";
-let escutaAssistenteAtiva = false;
-let escutaAssistentePausada = false;
-let cancelamentoAssistente = false;
-let finalizacaoAssistentePendente = false;
-let permissaoMicrofoneConcedida = false;
+let filtroCompromissos = "mes";
+let compromissosExpandidos = false;
 
 const appContainer = document.querySelector(".container");
 appContainer.classList.add("hidden");
@@ -275,9 +269,7 @@ async function iniciarApp() {
     await carregarDados();
 
     configurarCalendarios();
-    document.getElementById("rapidoData").value = hojeTexto();
     atualizarTudo();
-    prepararPermissaoMicrofone();
     fecharPerfil();
   } catch (error) {
     appContainer.classList.add("hidden");
@@ -501,348 +493,6 @@ form.addEventListener("submit", async function(e) {
   await carregarDados();
   atualizarTela();
   limparFormularioLancamento();
-});
-
-function definirStatusAssistente(texto, tipo = "") {
-  const status = document.getElementById("statusAssistente");
-  status.textContent = texto;
-  status.className = `assistant-status ${tipo}`.trim();
-}
-
-function abrirPermissaoMicrofone(bloqueado = false) {
-  document.getElementById("instrucaoMicrofoneBloqueado").classList.toggle("hidden", !bloqueado);
-  document.getElementById("modalPermissaoMicrofone").classList.remove("hidden");
-}
-
-function fecharPermissaoMicrofone() {
-  document.getElementById("modalPermissaoMicrofone").classList.add("hidden");
-}
-
-async function solicitarPermissaoMicrofone() {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    abrirPermissaoMicrofone(true);
-    definirStatusAssistente("Este navegador não permite solicitar o microfone. Use Chrome ou Edge atualizado.", "error");
-    return false;
-  }
-
-  try {
-    const fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
-    fluxo.getTracks().forEach(trilha => trilha.stop());
-    permissaoMicrofoneConcedida = true;
-    fecharPermissaoMicrofone();
-    definirStatusAssistente("Microfone liberado. Toque em “Começar” quando quiser falar.", "success");
-    return true;
-  } catch (error) {
-    permissaoMicrofoneConcedida = false;
-    abrirPermissaoMicrofone(true);
-    definirStatusAssistente("O microfone continua bloqueado. Altere a permissão deste site para “Permitir” e atualize a página.", "error");
-    return false;
-  }
-}
-
-async function prepararPermissaoMicrofone() {
-  const ReconhecimentoVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!ReconhecimentoVoz || !navigator.mediaDevices?.getUserMedia) return;
-  try {
-    if (navigator.permissions?.query) {
-      const permissao = await navigator.permissions.query({ name: "microphone" });
-      if (permissao.state === "granted") {
-        permissaoMicrofoneConcedida = true;
-        return;
-      }
-      abrirPermissaoMicrofone(permissao.state === "denied");
-      permissao.onchange = () => {
-        permissaoMicrofoneConcedida = permissao.state === "granted";
-        if (permissaoMicrofoneConcedida) fecharPermissaoMicrofone();
-      };
-      return;
-    }
-  } catch (error) {
-    console.info("Consulta de permissão de microfone indisponível.");
-  }
-  abrirPermissaoMicrofone(false);
-}
-
-document.getElementById("botaoPermitirMicrofone").addEventListener("click", solicitarPermissaoMicrofone);
-document.getElementById("botaoAgoraNaoMicrofone").addEventListener("click", fecharPermissaoMicrofone);
-
-function normalizarTexto(texto) {
-  return String(texto || "").toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function numeroFaladoParaValor(texto) {
-  const unidades = { zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13, quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19 };
-  const dezenas = { vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90 };
-  const centenas = { cem: 100, cento: 100, duzentos: 200, trezentos: 300, quatrocentos: 400, quinhentos: 500, seiscentos: 600, setecentos: 700, oitocentos: 800, novecentos: 900 };
-  const tokens = normalizarTexto(texto).split(/\s+/);
-  let total = 0;
-  let bloco = 0;
-  let reconhecidos = 0;
-  tokens.forEach(token => {
-    if (token === "e") return;
-    if (Object.hasOwn(unidades, token)) { bloco += unidades[token]; reconhecidos += 1; }
-    else if (Object.hasOwn(dezenas, token)) { bloco += dezenas[token]; reconhecidos += 1; }
-    else if (Object.hasOwn(centenas, token)) { bloco += centenas[token]; reconhecidos += 1; }
-    else if (token === "mil") { total += Math.max(bloco, 1) * 1000; bloco = 0; reconhecidos += 1; }
-  });
-  return reconhecidos ? total + bloco : 0;
-}
-
-function extrairValorAssistente(textoOriginal) {
-  const texto = normalizarTexto(textoOriginal);
-  const moeda = texto.match(/(?:r\$\s*)?(\d[\d.]*?(?:,\d{1,2})?)\s*(?:reais|real)\b/);
-  const aposVerbo = texto.match(/(?:gastei|paguei|comprei|recebi|ganhei|entrou|vendi|despesa|gasto|ganho)\D{0,15}(\d[\d.,]*)/);
-  const candidato = moeda?.[1] || aposVerbo?.[1] || texto.match(/\b\d+(?:[.,]\d{1,2})?\b/)?.[0];
-  if (candidato) {
-    const limpo = candidato.includes(",") ? candidato.replaceAll(".", "").replace(",", ".") : candidato;
-    const valor = Number(limpo);
-    if (valor > 0) return valor;
-  }
-  const antesDeReais = texto.match(/((?:[a-z]+\s+){0,8}[a-z]+)\s+(?:reais|real)\b/)?.[1] || texto;
-  return numeroFaladoParaValor(antesDeReais);
-}
-
-function inferirCategoriaAssistente(texto) {
-  const regras = [
-    ["Alimentação", ["mercado", "supermercado", "restaurante", "lanche", "comida", "ifood", "padaria"]],
-    ["Transporte", ["gasolina", "combustivel", "uber", "99", "onibus", "metro", "estacionamento"]],
-    ["Moradia", ["aluguel", "condominio", "energia", "luz", "agua", "internet"]],
-    ["Saúde", ["farmacia", "remedio", "medico", "consulta", "exame", "dentista"]],
-    ["Educação", ["curso", "faculdade", "escola", "livro", "mensalidade"]],
-    ["Lazer", ["cinema", "viagem", "bar", "show", "jogo"]],
-    ["Assinaturas", ["netflix", "spotify", "assinatura", "prime", "disney"]],
-    ["Salário", ["salario", "pagamento", "holerite"]],
-    ["Investimentos", ["investimento", "dividendo", "rendimento", "aplicacao"]]
-  ];
-  return regras.find(([, palavras]) => palavras.some(palavra => texto.includes(palavra)))?.[0] || "Outros";
-}
-
-function dataComDiferenca(dias) {
-  const data = new Date();
-  data.setDate(data.getDate() + dias);
-  const ano = data.getFullYear();
-  const mes = String(data.getMonth() + 1).padStart(2, "0");
-  const dia = String(data.getDate()).padStart(2, "0");
-  return `${ano}-${mes}-${dia}`;
-}
-
-function inferirDataAssistente(texto) {
-  if (texto.includes("anteontem")) return dataComDiferenca(-2);
-  if (texto.includes("ontem")) return dataComDiferenca(-1);
-  const dataFalada = texto.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);
-  if (dataFalada) {
-    const anoInformado = dataFalada[3] ? Number(dataFalada[3]) : new Date().getFullYear();
-    const ano = anoInformado < 100 ? 2000 + anoInformado : anoInformado;
-    return `${ano}-${String(Number(dataFalada[2])).padStart(2, "0")}-${String(Number(dataFalada[1])).padStart(2, "0")}`;
-  }
-  return hojeTexto();
-}
-
-function interpretarLancamento(textoOriginal) {
-  const texto = normalizarTexto(textoOriginal);
-  const palavrasReceita = ["recebi", "ganhei", "entrou", "vendi", "salario", "rendimento", "receita"];
-  const tipo = palavrasReceita.some(palavra => texto.includes(palavra)) ? "receita" : "despesa";
-  const valor = extrairValorAssistente(textoOriginal);
-  const categoria = inferirCategoriaAssistente(texto);
-  const descricao = textoOriginal.trim().replace(/^./, letra => letra.toLocaleUpperCase("pt-BR")).slice(0, 180);
-
-  document.getElementById("rapidoTipo").value = tipo;
-  document.getElementById("rapidoValor").value = valor > 0 ? valor.toFixed(2) : "";
-  document.getElementById("rapidoCategoria").value = categoria;
-  document.getElementById("rapidoDescricao").value = descricao || categoria;
-  document.getElementById("rapidoData").value = inferirDataAssistente(texto);
-
-  if (valor > 0) {
-    definirStatusAssistente(`Entendi: ${tipo === "receita" ? "ganho" : "gasto"} de ${formatarMoeda(valor)} em ${categoria}. Confira e toque em Adicionar lançamento.`, "success");
-  } else {
-    definirStatusAssistente("Entendi parte da frase, mas não encontrei o valor. Digite o valor antes de salvar.", "error");
-  }
-}
-
-function interpretarComandoDigitado() {
-  const comando = document.getElementById("comandoAssistente").value.trim();
-  if (!comando) return definirStatusAssistente("Digite uma frase ou use o botão Falar.", "error");
-  if (escutaAssistenteAtiva) pausarEscutaAssistente();
-  interpretarLancamento(comando);
-}
-
-function atualizarControlesAssistente(estado) {
-  const botaoPrincipal = document.getElementById("botaoMicrofone");
-  const botaoPausar = document.getElementById("botaoPausarMicrofone");
-  const botaoFinalizar = document.getElementById("botaoFinalizarMicrofone");
-  const botaoCancelar = document.getElementById("botaoCancelarMicrofone");
-  const ouvindo = estado === "ouvindo";
-  const pausado = estado === "pausado";
-
-  botaoPrincipal.disabled = ouvindo;
-  botaoPrincipal.classList.toggle("listening", ouvindo);
-  botaoPrincipal.innerHTML = ouvindo
-    ? "<span>●</span> Ouvindo..."
-    : pausado ? "<span>●</span> Continuar" : "<span>●</span> Começar";
-  botaoPausar.classList.toggle("hidden", !ouvindo);
-  botaoFinalizar.classList.toggle("hidden", !ouvindo && !pausado);
-  botaoCancelar.classList.toggle("hidden", estado === "parado" && !document.getElementById("comandoAssistente").value.trim());
-}
-
-async function iniciarOuContinuarEscuta() {
-  const ReconhecimentoVoz = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!ReconhecimentoVoz) {
-    definirStatusAssistente("O clique funcionou, mas este navegador não possui transcrição por voz. No computador, use Chrome ou Edge atualizado; o campo de texto continua disponível.", "error");
-    return;
-  }
-
-  if (!permissaoMicrofoneConcedida && !(await solicitarPermissaoMicrofone())) return;
-
-  if (reconhecimentoAssistente) return;
-  cancelamentoAssistente = false;
-  finalizacaoAssistentePendente = false;
-  escutaAssistenteAtiva = true;
-  escutaAssistentePausada = false;
-  trechoFinalSessao = "";
-  reconhecimentoAssistente = new ReconhecimentoVoz();
-  reconhecimentoAssistente.lang = "pt-BR";
-  reconhecimentoAssistente.interimResults = true;
-  reconhecimentoAssistente.continuous = true;
-  reconhecimentoAssistente.maxAlternatives = 1;
-  atualizarControlesAssistente("ouvindo");
-  definirStatusAssistente("Estou ouvindo. Pause quando quiser; nada será interpretado ou salvo enquanto você fala.");
-
-  reconhecimentoAssistente.onresult = evento => {
-    let trechoParcial = "";
-    for (let indice = evento.resultIndex; indice < evento.results.length; indice += 1) {
-      const trecho = evento.results[indice][0].transcript.trim();
-      if (evento.results[indice].isFinal) trechoFinalSessao += `${trecho} `;
-      else trechoParcial += `${trecho} `;
-    }
-    document.getElementById("comandoAssistente").value = `${transcricaoAssistente} ${trechoFinalSessao} ${trechoParcial}`.replace(/\s+/g, " ").trim();
-  };
-
-  reconhecimentoAssistente.onerror = evento => {
-    if (evento.error === "no-speech" || evento.error === "aborted") return;
-    escutaAssistenteAtiva = false;
-    escutaAssistentePausada = false;
-    if (evento.error === "not-allowed") {
-      permissaoMicrofoneConcedida = false;
-      abrirPermissaoMicrofone(true);
-    }
-    definirStatusAssistente(evento.error === "not-allowed"
-      ? "O acesso ao microfone foi bloqueado. Libere o microfone nas permissões do navegador e tente novamente."
-      : "Não consegui usar o microfone. Você pode tentar novamente ou digitar a frase.", "error");
-  };
-
-  reconhecimentoAssistente.onend = () => {
-    transcricaoAssistente = `${transcricaoAssistente} ${trechoFinalSessao}`.replace(/\s+/g, " ").trim();
-    document.getElementById("comandoAssistente").value = transcricaoAssistente;
-    trechoFinalSessao = "";
-    reconhecimentoAssistente = null;
-    if (cancelamentoAssistente) { atualizarControlesAssistente("parado"); return; }
-    if (finalizacaoAssistentePendente) {
-      finalizacaoAssistentePendente = false;
-      concluirFinalizacaoAssistente();
-      return;
-    }
-    if (escutaAssistenteAtiva && !escutaAssistentePausada) {
-      setTimeout(iniciarOuContinuarEscuta, 250);
-      return;
-    }
-    atualizarControlesAssistente(escutaAssistentePausada ? "pausado" : "parado");
-  };
-
-  try {
-    reconhecimentoAssistente.start();
-  } catch (error) {
-    reconhecimentoAssistente = null;
-    escutaAssistenteAtiva = false;
-    atualizarControlesAssistente("parado");
-    definirStatusAssistente("O microfone já está em uso. Aguarde um instante e tente novamente.", "error");
-  }
-}
-
-function pausarEscutaAssistente() {
-  escutaAssistenteAtiva = false;
-  escutaAssistentePausada = true;
-  reconhecimentoAssistente?.stop();
-  atualizarControlesAssistente("pausado");
-  definirStatusAssistente("Áudio pausado. Confira o texto, continue falando ou clique em “Interpretar antes de enviar”.");
-}
-
-function concluirFinalizacaoAssistente() {
-  const comando = document.getElementById("comandoAssistente").value.trim();
-  atualizarControlesAssistente("parado");
-  if (!comando) {
-    definirStatusAssistente("Não encontrei nenhuma fala para interpretar. Tente gravar novamente.", "error");
-    return;
-  }
-  interpretarLancamento(comando);
-}
-
-function finalizarEscutaAssistente() {
-  escutaAssistenteAtiva = false;
-  escutaAssistentePausada = false;
-  finalizacaoAssistentePendente = true;
-  definirStatusAssistente("Finalizando o áudio e interpretando sua fala...");
-  if (reconhecimentoAssistente) reconhecimentoAssistente.stop();
-  else {
-    finalizacaoAssistentePendente = false;
-    concluirFinalizacaoAssistente();
-  }
-}
-
-function cancelarEscutaAssistente() {
-  cancelamentoAssistente = true;
-  finalizacaoAssistentePendente = false;
-  escutaAssistenteAtiva = false;
-  escutaAssistentePausada = false;
-  reconhecimentoAssistente?.abort();
-  reconhecimentoAssistente = null;
-  transcricaoAssistente = "";
-  trechoFinalSessao = "";
-  document.getElementById("comandoAssistente").value = "";
-  document.getElementById("formLancamentoRapido").reset();
-  document.getElementById("rapidoData").value = hojeTexto();
-  atualizarControlesAssistente("parado");
-  definirStatusAssistente("Gravação cancelada. Nenhum lançamento foi criado.");
-}
-
-document.getElementById("botaoMicrofone").addEventListener("click", iniciarOuContinuarEscuta);
-document.getElementById("botaoPausarMicrofone").addEventListener("click", pausarEscutaAssistente);
-document.getElementById("botaoFinalizarMicrofone").addEventListener("click", finalizarEscutaAssistente);
-document.getElementById("botaoCancelarMicrofone").addEventListener("click", cancelarEscutaAssistente);
-document.getElementById("botaoInterpretarAssistente").addEventListener("click", interpretarComandoDigitado);
-document.getElementById("comandoAssistente").addEventListener("keydown", event => {
-  if (event.key === "Enter") { event.preventDefault(); interpretarComandoDigitado(); }
-});
-
-document.getElementById("formLancamentoRapido").addEventListener("submit", async event => {
-  event.preventDefault();
-  const botao = document.getElementById("botaoSalvarRapido");
-  const novo = {
-    tipo: document.getElementById("rapidoTipo").value,
-    valor: Number(document.getElementById("rapidoValor").value),
-    categoria: document.getElementById("rapidoCategoria").value.trim(),
-    descricao: document.getElementById("rapidoDescricao").value.trim(),
-    data: document.getElementById("rapidoData").value || hojeTexto(),
-    user_id: usuarioAtual.id
-  };
-  if (!novo.categoria || !novo.descricao || novo.valor <= 0) return definirStatusAssistente("Revise o valor, a categoria e a descrição.", "error");
-
-  botao.disabled = true;
-  botao.textContent = "Salvando...";
-  const { error } = await supabaseClient.from("lancamentos").insert([novo]);
-  botao.disabled = false;
-  botao.textContent = "Adicionar lançamento";
-  if (error) return definirStatusAssistente(mensagemErro(error, "Não foi possível salvar o lançamento."), "error");
-
-  await carregarDados();
-  atualizarTudo();
-  document.getElementById("formLancamentoRapido").reset();
-  document.getElementById("comandoAssistente").value = "";
-  document.getElementById("rapidoData").value = hojeTexto();
-  transcricaoAssistente = "";
-  trechoFinalSessao = "";
-  escutaAssistentePausada = false;
-  atualizarControlesAssistente("parado");
-  definirStatusAssistente(`Lançamento de ${formatarMoeda(novo.valor)} adicionado. O saldo geral e o mês foram atualizados.`, "success");
 });
 
 function editarLancamento(id) {
@@ -1297,17 +947,72 @@ function atualizarInsights({ receitas, despesas, saldoPrevisto, taxaEconomia, or
   lista.innerHTML = insights.slice(0, 4).map(item => `<div class="insight-item"><span>${item.icon}</span><div><strong>${escaparHTML(item.title)}</strong><p>${escaparHTML(item.text)}</p></div></div>`).join("");
 }
 
+function dataParcelaPorIndice(item, indiceParcela) {
+  const [anoBase, mesBase] = item.data_primeira_parcela.split("-").map(Number);
+  const indiceMes = anoBase * 12 + (mesBase - 1) + indiceParcela;
+  const ano = Math.floor(indiceMes / 12);
+  const mes = indiceMes % 12;
+  const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+  const dia = Math.min(Number(item.dia_vencimento), ultimoDia);
+  return `${ano}-${String(mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
+function definirFiltroCompromissos(filtro) {
+  filtroCompromissos = filtro === "todos" ? "todos" : "mes";
+  compromissosExpandidos = false;
+  atualizarCompromissos();
+}
+
+function alternarCompromissosExpandidos() {
+  compromissosExpandidos = !compromissosExpandidos;
+  atualizarCompromissos();
+}
+
 function atualizarCompromissos() {
   const container = document.getElementById("proximosCompromissos");
-  const compromissos = contasFixas.map(conta => ({ nome: conta.nome, data: conta.vencimento, valor: Number(conta.valor), tipo: "Conta fixa" }));
+  const compromissos = contasFixas.map(conta => ({
+    nome: conta.nome,
+    data: conta.vencimento,
+    valor: Number(conta.valor),
+    tipo: "Conta fixa"
+  }));
+
   cartoesParcelados.forEach(item => {
-    const data = calcularProximoVencimento(item);
-    if (data) compromissos.push({ nome: `${item.cartao_nome} · ${item.descricao}`, data, valor: Number(item.valor_total) / Number(item.total_parcelas), tipo: "Parcela" });
+    const totalParcelas = Number(item.total_parcelas);
+    const parcelasPagas = Number(item.parcelas_pagas);
+    const valorParcela = Number(item.valor_total) / totalParcelas;
+    for (let indice = parcelasPagas; indice < totalParcelas; indice += 1) {
+      compromissos.push({
+        nome: `${item.cartao_nome} · ${item.descricao}`,
+        data: dataParcelaPorIndice(item, indice),
+        valor: valorParcela,
+        tipo: `Parcela ${indice + 1}/${totalParcelas}`
+      });
+    }
   });
+
   compromissos.sort((a, b) => a.data.localeCompare(b.data));
-  container.innerHTML = compromissos.length ? compromissos.slice(0, 6).map(item => `
+  const filtrados = filtroCompromissos === "mes"
+    ? compromissos.filter(item => item.data?.slice(0, 7) === mesDashboard)
+    : compromissos;
+  const exibidos = compromissosExpandidos ? filtrados : filtrados.slice(0, 4);
+
+  document.getElementById("filtroCompromissosMes").classList.toggle("active", filtroCompromissos === "mes");
+  document.getElementById("filtroCompromissosTodos").classList.toggle("active", filtroCompromissos === "todos");
+  document.getElementById("resumoCompromissos").textContent = `${filtrados.length} ${filtrados.length === 1 ? "compromisso" : "compromissos"}`;
+  document.getElementById("periodoCompromissos").textContent = filtroCompromissos === "mes"
+    ? nomeDoMes(mesDashboard).replace(/^./, letra => letra.toUpperCase())
+    : "Todos os períodos";
+
+  container.innerHTML = exibidos.length ? exibidos.map(item => `
     <div class="commitment-item"><div class="commitment-date"><strong>${item.data.slice(8, 10)}</strong><span>${nomeDoMes(item.data.slice(0, 7)).split(" ")[0].slice(0, 3)}</span></div><div><strong>${escaparHTML(item.nome)}</strong><p>${item.tipo} · ${formatarData(item.data)}</p></div><strong>${formatarMoeda(item.valor)}</strong></div>`).join("")
-    : '<p class="empty-state">Nenhum compromisso futuro cadastrado.</p>';
+    : `<p class="empty-state">Nenhum compromisso encontrado ${filtroCompromissos === "mes" ? "no mês selecionado" : ""}.</p>`;
+
+  const botaoExpandir = document.getElementById("botaoExpandirCompromissos");
+  botaoExpandir.classList.toggle("hidden", filtrados.length <= 4);
+  botaoExpandir.textContent = compromissosExpandidos
+    ? "Mostrar menos"
+    : `Mostrar mais (${filtrados.length - 4})`;
 }
 
 function atualizarReserva() {
