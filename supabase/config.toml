@@ -24,3 +24,6 @@ enable_signup = true
 
 [functions.delete-account]
 verify_jwt = true
+
+[functions.profile-access]
+verify_jwt = false

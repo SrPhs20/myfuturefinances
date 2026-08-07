@@ -2,7 +2,8 @@ const SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYWZ5bHpucHJpYm1wdW1jZ3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzA1NzcsImV4cCI6MjA5NjcwNjU3N30.a1Tg7EAsusekhQ3gdUopSE4b0MDSbP-YQEiv3khQeI4";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const COLUNAS_PERFIL = "id,user_id,nome,avatar_url,created_at,updated_at,pin_length";
+const COLUNAS_PERFIL = "id,user_id,public_id,nome,avatar_url,created_at,updated_at,pin_length";
+const CONTAS_DISPOSITIVO_KEY = "myfuturefinances:contas:v1";
 
 let usuarioAtual = null;
 let lancamentos = [];
@@ -27,6 +28,8 @@ let filtroCompromissos = "mes";
 let compromissosExpandidos = false;
 let validandoPin = false;
 let temporizadorBloqueioPin = null;
+let contasDispositivo = [];
+let modoMigracaoConta = false;
 
 const appContainer = document.querySelector(".container");
 appContainer.classList.add("hidden");
@@ -35,6 +38,47 @@ document.body.insertAdjacentHTML("afterbegin", `
 <section id="authScreen" class="auth-screen">
   <div class="money-orbit money-orbit-one" aria-hidden="true">R$</div>
   <div class="money-orbit money-orbit-two" aria-hidden="true">+</div>
+
+  <div class="account-chooser" id="accountChooser">
+    <div class="gate-brand"><span>R$</span><strong>Minhas Finanças</strong></div>
+    <span class="chooser-eyebrow">Seu dinheiro. Suas escolhas.</span>
+    <h1>Quem vai entrar?</h1>
+    <p>Escolha uma conta para ver sua vida financeira.</p>
+    <div id="accountsGrid" class="accounts-grid"></div>
+    <button class="add-account-button" type="button" onclick="abrirCriacaoConta()">
+      <span aria-hidden="true">+</span>
+      <strong>Criar conta</strong>
+    </button>
+    <p id="chooserMessage" class="chooser-message" aria-live="polite"></p>
+  </div>
+
+  <div class="account-create hidden" id="accountCreate">
+    <button class="create-back" type="button" onclick="fecharCriacaoConta()" aria-label="Voltar">←</button>
+    <div class="gate-brand"><span>R$</span><strong>Minhas Finanças</strong></div>
+    <span class="chooser-eyebrow">Novo perfil</span>
+    <h1>Crie sua conta</h1>
+    <p>Você só precisa de uma foto, seu nome e um PIN numérico.</p>
+
+    <label class="create-avatar-picker" for="novaContaFoto">
+      <span class="create-avatar-preview">
+        <img id="novaContaFotoPreview" class="hidden" alt="Prévia da foto" />
+        <span id="novaContaFotoPlaceholder">+</span>
+      </span>
+      <strong>Escolher foto</strong>
+    </label>
+    <input id="novaContaFoto" class="hidden" type="file" accept="image/jpeg,image/png,image/webp" onchange="mostrarPreviewNovaConta(this)" />
+
+    <div class="create-fields">
+      <label for="novaContaNome">Seu nome</label>
+      <input id="novaContaNome" type="text" maxlength="80" autocomplete="name" placeholder="Como quer ser chamado?" />
+      <label for="novaContaPin">Crie uma senha numérica</label>
+      <input id="novaContaPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="4 a 8 números" oninput="limitarCampoPin(this)" />
+      <label for="novaContaPinConfirmacao">Confirme a senha</label>
+      <input id="novaContaPinConfirmacao" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="Repita os números" oninput="limitarCampoPin(this)" />
+      <button id="botaoCriarConta" type="button" onclick="criarContaPorPerfil()">Criar minha conta</button>
+      <p id="createAccountMessage" class="pin-message" aria-live="polite"></p>
+    </div>
+  </div>
 
   <div class="profile-gate hidden" id="profileGate">
     <div class="gate-brand"><span>R$</span><strong>Minhas Finanças</strong></div>
@@ -75,43 +119,10 @@ document.body.insertAdjacentHTML("afterbegin", `
       <p id="pinSetupMensagem" class="pin-message" aria-live="polite"></p>
     </div>
 
-    <button class="gate-switch" type="button" onclick="sair()">Usar outra conta</button>
-  </div>
-
-  <div class="auth-card" id="loginBox">
-    <div class="auth-brand-mark">R$</div>
-    <span class="eyebrow">Acesso seguro</span>
-    <h1>Minhas Finanças</h1>
-    <p>Entre uma vez com sua conta. Depois, use apenas seu PIN neste dispositivo.</p>
-    <label for="authEmail">Email</label>
-    <input id="authEmail" type="email" autocomplete="email" placeholder="Seu email" />
-    <label for="authSenha">Senha</label>
-    <input id="authSenha" type="password" autocomplete="current-password" placeholder="Sua senha" />
-    <button onclick="entrar()">Entrar com minha conta</button>
-    <button class="secondary" onclick="mostrarCadastro()">Criar conta</button>
-    <p id="authMensagem" class="auth-message" aria-live="polite"></p>
-  </div>
-
-  <div class="auth-card hidden" id="cadastroBox">
-    <div class="auth-brand-mark">R$</div>
-    <span class="eyebrow">Seu primeiro passo</span>
-    <h1>Criar conta</h1>
-    <p>Monte sua vida financeira em um espaço só seu.</p>
-    <label for="authNome">Nome</label>
-    <input id="authNome" type="text" placeholder="Seu nome" />
-    <label for="authEmailCadastro">Email</label>
-    <input id="authEmailCadastro" type="email" autocomplete="email" placeholder="Seu email" />
-    <label for="authSenhaCadastro">Senha da conta</label>
-    <input id="authSenhaCadastro" type="password" autocomplete="new-password" placeholder="Sua senha" />
-    <button onclick="cadastrar()">Criar conta</button>
-    <button class="secondary" onclick="mostrarLogin()">Voltar para login</button>
-    <p id="authMensagemCadastro" class="auth-message" aria-live="polite"></p>
+    <button class="gate-switch" type="button" onclick="voltarParaContas()">← Voltar para as contas</button>
   </div>
 </section>
 `);
-
-document.getElementById("loginBox").classList.remove("hidden");
-document.getElementById("cadastroBox").classList.add("hidden");
 
 appContainer.insertAdjacentHTML("afterbegin", `
   <div class="user-bar">
@@ -213,8 +224,7 @@ function formatarData(data) {
 }
 
 function mostrarMensagemAuth(texto) {
-  document.getElementById("authMensagem").textContent = texto;
-  document.getElementById("authMensagemCadastro").textContent = texto;
+  document.getElementById("chooserMessage").textContent = texto || "";
 }
 
 function limitarCampoPin(campo) {
@@ -233,6 +243,196 @@ function iniciaisDoPerfil(nome) {
   return (partes.length > 1 ? `${partes[0][0]}${partes.at(-1)[0]}` : partes[0]?.slice(0, 2) || "MF").toUpperCase();
 }
 
+function idsContasLembradas() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(CONTAS_DISPOSITIVO_KEY) || "[]");
+    return Array.isArray(ids) ? [...new Set(ids.filter(id => typeof id === "string"))].slice(0, 20) : [];
+  } catch {
+    return [];
+  }
+}
+
+function salvarIdsContas(ids) {
+  localStorage.setItem(CONTAS_DISPOSITIVO_KEY, JSON.stringify([...new Set(ids)].slice(0, 20)));
+}
+
+function lembrarConta(publicId) {
+  if (!publicId) return;
+  salvarIdsContas([publicId, ...idsContasLembradas().filter(id => id !== publicId)]);
+}
+
+async function chamarAcessoPerfis(body) {
+  const { data, error } = await supabaseClient.functions.invoke("profile-access", { body });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.mensagem || "Não foi possível concluir esta operação.");
+  return data;
+}
+
+function cardContaHTML(conta) {
+  const id = escaparHTML(conta.public_id);
+  const nome = escaparHTML(conta.nome || "Minha conta");
+  const avatar = conta.avatar_url
+    ? `<img src="${escaparHTML(conta.avatar_url)}" alt="Foto de ${nome}" />`
+    : `<span>${escaparHTML(iniciaisDoPerfil(conta.nome))}</span>`;
+  return `<article class="account-profile">
+    <button class="account-profile-main" type="button" onclick="selecionarConta('${id}')" aria-label="Entrar na conta de ${nome}">
+      <span class="account-profile-avatar">${avatar}</span>
+      <strong>${nome}</strong>
+      <small>Saldo atual</small>
+      <b>${formatarMoeda(conta.saldo)}</b>
+    </button>
+    <button class="forget-account" type="button" onclick="removerContaDesteAparelho('${id}', event)" aria-label="Remover ${nome} deste aparelho" title="Remover deste aparelho">×</button>
+  </article>`;
+}
+
+async function carregarContasDoDispositivo() {
+  const grade = document.getElementById("accountsGrid");
+  const ids = idsContasLembradas();
+  contasDispositivo = [];
+
+  if (!ids.length) {
+    grade.innerHTML = '<div class="chooser-empty"><span>R$</span><strong>Nenhuma conta neste aparelho</strong><p>Crie a primeira conta para começar.</p></div>';
+    return;
+  }
+
+  grade.innerHTML = '<div class="accounts-loading"><span></span><p>Carregando contas…</p></div>';
+  try {
+    const resposta = await chamarAcessoPerfis({ action: "list", ids });
+    contasDispositivo = resposta.contas || [];
+    salvarIdsContas(contasDispositivo.map(conta => conta.public_id));
+    grade.innerHTML = contasDispositivo.length
+      ? contasDispositivo.map(cardContaHTML).join("")
+      : '<div class="chooser-empty"><span>R$</span><strong>Nenhuma conta encontrada</strong><p>Você pode criar uma nova conta.</p></div>';
+  } catch (error) {
+    grade.innerHTML = '<div class="chooser-empty"><strong>Não foi possível carregar as contas.</strong><p>Tente atualizar a página.</p></div>';
+    mostrarMensagemAuth(mensagemErro(error, "Não foi possível carregar as contas."));
+  }
+}
+
+async function mostrarSeletorContas() {
+  clearInterval(temporizadorBloqueioPin);
+  validandoPin = false;
+  modoMigracaoConta = false;
+  appContainer.classList.add("hidden");
+  document.getElementById("profileGate").classList.add("hidden");
+  document.getElementById("accountCreate").classList.add("hidden");
+  document.getElementById("accountChooser").classList.remove("hidden");
+  authScreen.classList.remove("hidden");
+  mostrarMensagemAuth("");
+  await carregarContasDoDispositivo();
+}
+
+function selecionarConta(publicId) {
+  const conta = contasDispositivo.find(item => item.public_id === publicId);
+  if (!conta) return;
+  perfilAtual = { ...conta };
+  prepararTelaDoPerfil();
+  abrirEntradaPin();
+}
+
+async function removerContaDesteAparelho(publicId, event) {
+  event?.stopPropagation();
+  salvarIdsContas(idsContasLembradas().filter(id => id !== publicId));
+  await carregarContasDoDispositivo();
+}
+
+function voltarParaContas() {
+  clearInterval(temporizadorBloqueioPin);
+  document.getElementById("pinAcesso").value = "";
+  document.getElementById("profileGate").classList.add("hidden");
+  document.getElementById("accountChooser").classList.remove("hidden");
+  perfilAtual = null;
+  validandoPin = false;
+}
+
+function abrirCriacaoConta() {
+  document.getElementById("accountChooser").classList.add("hidden");
+  document.getElementById("accountCreate").classList.remove("hidden");
+  document.getElementById("novaContaNome").focus();
+}
+
+function fecharCriacaoConta() {
+  document.getElementById("accountCreate").classList.add("hidden");
+  document.getElementById("accountChooser").classList.remove("hidden");
+  document.getElementById("createAccountMessage").textContent = "";
+}
+
+function mostrarPreviewNovaConta(campo) {
+  const arquivo = campo.files?.[0];
+  const preview = document.getElementById("novaContaFotoPreview");
+  const placeholder = document.getElementById("novaContaFotoPlaceholder");
+  if (!arquivo) {
+    preview.classList.add("hidden");
+    placeholder.classList.remove("hidden");
+    return;
+  }
+  preview.src = URL.createObjectURL(arquivo);
+  preview.classList.remove("hidden");
+  placeholder.classList.add("hidden");
+}
+
+async function criarContaPorPerfil() {
+  const nome = document.getElementById("novaContaNome").value.trim();
+  const pin = document.getElementById("novaContaPin").value;
+  const confirmacao = document.getElementById("novaContaPinConfirmacao").value;
+  const foto = document.getElementById("novaContaFoto").files?.[0];
+  const mensagem = document.getElementById("createAccountMessage");
+  const botao = document.getElementById("botaoCriarConta");
+
+  if (nome.length < 2) return mensagem.textContent = "Digite seu nome.";
+  if (!/^\d{4,8}$/.test(pin)) return mensagem.textContent = "Crie uma senha com 4 a 8 números.";
+  if (pin !== confirmacao) return mensagem.textContent = "As duas senhas precisam ser iguais.";
+  if (foto && !foto.type.startsWith("image/")) return mensagem.textContent = "Escolha uma foto válida.";
+
+  botao.disabled = true;
+  mensagem.textContent = "Criando seu perfil…";
+  try {
+    const resposta = await chamarAcessoPerfis({ action: "create", nome, pin });
+    lembrarConta(resposta.conta.public_id);
+    const { data: autenticacao, error: erroAutenticacao } = await supabaseClient.auth.verifyOtp({
+      token_hash: resposta.token_hash,
+      type: "email"
+    });
+    if (erroAutenticacao || !autenticacao.user) throw erroAutenticacao || new Error("Conta não autenticada.");
+
+    usuarioAtual = autenticacao.user;
+    let avatarUrl = "";
+    if (foto) {
+      try {
+        mensagem.textContent = "Preparando sua foto…";
+        const imagem = await prepararImagemPerfil(foto);
+        const caminho = `${usuarioAtual.id}/avatar.jpg`;
+        const { error: erroUpload } = await supabaseClient.storage.from("avatars")
+          .upload(caminho, imagem, { contentType: "image/jpeg", upsert: true });
+        if (erroUpload) throw erroUpload;
+        const { data: urlPublica } = supabaseClient.storage.from("avatars").getPublicUrl(caminho);
+        avatarUrl = `${urlPublica.publicUrl}?v=${Date.now()}`;
+        const { error: erroPerfil } = await supabaseClient.from("perfis")
+          .update({ avatar_url: avatarUrl })
+          .eq("user_id", usuarioAtual.id);
+        if (erroPerfil) throw erroPerfil;
+      } catch (erroFoto) {
+        console.warn("Conta criada sem foto:", erroFoto);
+      }
+    }
+
+    await supabaseClient.auth.signOut({ scope: "local" });
+    usuarioAtual = null;
+    document.getElementById("novaContaNome").value = "";
+    document.getElementById("novaContaPin").value = "";
+    document.getElementById("novaContaPinConfirmacao").value = "";
+    document.getElementById("novaContaFoto").value = "";
+    document.getElementById("novaContaFotoPreview").classList.add("hidden");
+    document.getElementById("novaContaFotoPlaceholder").classList.remove("hidden");
+    fecharCriacaoConta();
+    await carregarContasDoDispositivo();
+  } catch (error) {
+    mensagem.textContent = mensagemErro(error, "Não foi possível criar a conta.");
+  } finally {
+    botao.disabled = false;
+  }
+}
+
 function prepararTelaDoPerfil() {
   const nome = perfilAtual?.nome || usuarioAtual?.email?.split("@")[0] || "Meu perfil";
   const avatar = perfilAtual?.avatar_url || "";
@@ -240,7 +440,8 @@ function prepararTelaDoPerfil() {
   const gateInitials = document.getElementById("gateInitials");
 
   document.getElementById("gateName").textContent = nome;
-  document.getElementById("gateBalance").textContent = formatarMoeda(saldoAtualDoPerfil());
+  const saldoExibido = Object.hasOwn(perfilAtual || {}, "saldo") ? Number(perfilAtual.saldo) : saldoAtualDoPerfil();
+  document.getElementById("gateBalance").textContent = formatarMoeda(saldoExibido);
   gateInitials.textContent = iniciaisDoPerfil(nome);
 
   if (avatar) {
@@ -253,8 +454,8 @@ function prepararTelaDoPerfil() {
     gateInitials.classList.remove("hidden");
   }
 
-  document.getElementById("loginBox").classList.add("hidden");
-  document.getElementById("cadastroBox").classList.add("hidden");
+  document.getElementById("accountChooser").classList.add("hidden");
+  document.getElementById("accountCreate").classList.add("hidden");
   document.getElementById("profileGate").classList.remove("hidden", "unlocking", "pin-error");
   document.getElementById("pinPanel").classList.add("hidden");
   document.getElementById("gateHint").classList.remove("hidden");
@@ -263,6 +464,7 @@ function prepararTelaDoPerfil() {
 
   const possuiPin = Number(perfilAtual?.pin_length) >= 4;
   document.getElementById("pinSetup").classList.toggle("hidden", possuiPin);
+  document.querySelector("#profileGate .gate-switch").classList.toggle("hidden", !possuiPin && modoMigracaoConta);
   document.getElementById("gateHint").textContent = possuiPin
     ? "Toque na foto para entrar"
     : "Crie um PIN para proteger este perfil";
@@ -332,9 +534,10 @@ async function validarPinDigitado(pin) {
   const mensagem = document.getElementById("pinMensagem");
   mensagem.textContent = "Verificando…";
 
-  const { data, error } = await supabaseClient.rpc("verificar_pin_acesso", { p_pin: pin });
-
-  if (error) {
+  let data;
+  try {
+    data = await chamarAcessoPerfis({ action: "login", public_id: perfilAtual.public_id, pin });
+  } catch (error) {
     validandoPin = false;
     campo.value = "";
     atualizarPontosPin(0);
@@ -343,7 +546,21 @@ async function validarPinDigitado(pin) {
   }
 
   if (data?.valido) {
-    desbloquearAplicativo();
+    mensagem.textContent = "Abrindo sua conta…";
+    const { data: autenticacao, error: erroAutenticacao } = await supabaseClient.auth.verifyOtp({
+      token_hash: data.token_hash,
+      type: "email"
+    });
+    if (erroAutenticacao || !autenticacao.user) {
+      validandoPin = false;
+      campo.value = "";
+      atualizarPontosPin(0);
+      mensagem.textContent = mensagemErro(erroAutenticacao, "Não foi possível abrir a conta.");
+      return;
+    }
+    usuarioAtual = autenticacao.user;
+    lembrarConta(perfilAtual.public_id);
+    await iniciarApp({ bloquear: false });
     return;
   }
 
@@ -388,7 +605,14 @@ async function configurarPinInicial() {
   perfilAtual.pin_length = Number(data?.tamanho) || pin.length;
   document.getElementById("novoPinGate").value = "";
   document.getElementById("confirmarPinGate").value = "";
-  desbloquearAplicativo();
+  lembrarConta(perfilAtual.public_id);
+  if (modoMigracaoConta) {
+    await supabaseClient.auth.signOut({ scope: "local" });
+    usuarioAtual = null;
+    await mostrarSeletorContas();
+  } else {
+    desbloquearAplicativo();
+  }
 }
 
 function desbloquearAplicativo() {
@@ -406,71 +630,9 @@ function desbloquearAplicativo() {
   }, 720);
 }
 
-async function cadastrar() {
-  const nome = document.getElementById("authNome").value.trim();
-
-const email = document
-  .getElementById("authEmailCadastro")
-  .value.trim();
-
-const senha = document
-  .getElementById("authSenhaCadastro")
-  .value.trim();
-
-  if (!nome || !email || !senha) {
-    mostrarMensagemAuth("Preencha todos os campos.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password: senha,
-    options: {
-      data: { nome }
-    }
-  });
-
-  if (error) {
-    mostrarMensagemAuth(error.message);
-    return;
-  }
-
-  document.getElementById("authSenha").value = "";
-
-  alert("Conta criada com sucesso.");
-
-mostrarLogin();
-
-document.getElementById("authSenhaCadastro").value = "";
-}
-
-async function entrar() {
-  const email = document.getElementById("authEmail").value.trim();
-  const senha = document.getElementById("authSenha").value.trim();
-
-  if (!email || !senha) {
-    mostrarMensagemAuth("Digite email e senha.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password: senha
-  });
-
-  if (error) {
-    mostrarMensagemAuth(error.message);
-    return;
-  }
-
-  usuarioAtual = data.user;
-  mostrarMensagemAuth("Preparando seu perfil…");
-  await iniciarApp({ bloquear: true });
-}
-
 async function sair() {
   clearInterval(temporizadorBloqueioPin);
-  await supabaseClient.auth.signOut();
+  await supabaseClient.auth.signOut({ scope: "local" });
   usuarioAtual = null;
   perfilAtual = null;
   lancamentos = [];
@@ -481,25 +643,31 @@ async function sair() {
   metasMensais = [];
   metaMensal = 0;
   appContainer.classList.add("hidden");
-  document.getElementById("profileGate").classList.add("hidden");
-  document.getElementById("cadastroBox").classList.add("hidden");
-  document.getElementById("loginBox").classList.remove("hidden");
-  document.getElementById("authSenha").value = "";
-  mostrarMensagemAuth("");
-  authScreen.classList.remove("hidden");
+  await mostrarSeletorContas();
 }
 
 async function verificarSessao() {
   const { data } = await supabaseClient.auth.getSession();
 
   if (data.session) {
-    document.getElementById("modalPerfil").classList.add("hidden");
     usuarioAtual = data.session.user;
-    await iniciarApp({ bloquear: true });
-  } else {
-    appContainer.classList.add("hidden");
-    authScreen.classList.remove("hidden");
+    const { data: perfilSessao } = await supabaseClient.from("perfis")
+      .select(COLUNAS_PERFIL)
+      .eq("user_id", usuarioAtual.id)
+      .maybeSingle();
+    if (perfilSessao?.public_id) lembrarConta(perfilSessao.public_id);
+
+    if (perfilSessao && Number(perfilSessao.pin_length) < 4) {
+      modoMigracaoConta = true;
+      await iniciarApp({ bloquear: true });
+      return;
+    }
+
+    await supabaseClient.auth.signOut({ scope: "local" });
+    usuarioAtual = null;
   }
+
+  await mostrarSeletorContas();
 }
 
 async function iniciarApp({ bloquear = true } = {}) {
@@ -518,6 +686,8 @@ async function iniciarApp({ bloquear = true } = {}) {
     appContainer.classList.add("hidden");
     authScreen.classList.remove("hidden");
     mostrarMensagemAuth(mensagemErro(error, "Não foi possível iniciar o aplicativo."));
+    document.getElementById("accountChooser").classList.remove("hidden");
+    document.getElementById("profileGate").classList.add("hidden");
   }
 }
 async function carregarDados() {
@@ -1636,6 +1806,7 @@ async function salvarPerfil() {
 }
 
 async function excluirPerfil() {
+  const publicIdExcluido = perfilAtual?.public_id;
   const confirmar = confirm(
     "Tem certeza que deseja excluir seu perfil e todos os seus dados financeiros?\n\nEssa ação não poderá ser desfeita."
   );
@@ -1655,10 +1826,8 @@ async function excluirPerfil() {
   usuarioAtual = null;
   perfilAtual = null;
   appContainer.classList.add("hidden");
-  document.getElementById("profileGate").classList.add("hidden");
-  document.getElementById("cadastroBox").classList.add("hidden");
-  document.getElementById("loginBox").classList.remove("hidden");
-  authScreen.classList.remove("hidden");
+  if (publicIdExcluido) salvarIdsContas(idsContasLembradas().filter(id => id !== publicIdExcluido));
+  await mostrarSeletorContas();
 
   alert("Sua conta e seus dados foram excluídos.");
 }
@@ -1914,16 +2083,6 @@ async function excluirParcelamento(id) {
 
   await carregarDados();
   atualizarTudo();
-}
-
-function mostrarCadastro() {
-  document.getElementById("loginBox").classList.add("hidden");
-  document.getElementById("cadastroBox").classList.remove("hidden");
-}
-
-function mostrarLogin() {
-  document.getElementById("cadastroBox").classList.add("hidden");
-  document.getElementById("loginBox").classList.remove("hidden");
 }
 
 function calcularProximoVencimento(item) {
