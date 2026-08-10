@@ -211,6 +211,352 @@ function mensagemErro(error, fallback) {
   return error?.message || fallback;
 }
 
+/* ==========================================================================
+   Componentes de UI premium: toasts, modal de confirmação/prompt e
+   seletor customizado acessível (substitui alert/confirm/prompt nativos
+   e o <select> nativo do navegador, sem alterar nenhuma regra de negócio).
+   ========================================================================== */
+
+document.body.insertAdjacentHTML("beforeend", `
+  <div id="mfToastRegiao" class="mf-toast-region" aria-live="polite" aria-atomic="true"></div>
+  <div id="mfDialogOverlay" class="mf-dialog-overlay hidden">
+    <div id="mfDialogCard" class="mf-dialog-card" role="alertdialog" aria-modal="true" aria-labelledby="mfDialogTitulo" aria-describedby="mfDialogTexto">
+      <div class="mf-dialog-icon" id="mfDialogIcone" aria-hidden="true"></div>
+      <h2 id="mfDialogTitulo" class="mf-dialog-title"></h2>
+      <p id="mfDialogTexto" class="mf-dialog-text"></p>
+      <input id="mfDialogInput" class="mf-dialog-input hidden" type="number" step="0.01" inputmode="decimal" />
+      <div class="mf-dialog-actions">
+        <button type="button" id="mfDialogCancelar" class="secondary">Cancelar</button>
+        <button type="button" id="mfDialogConfirmar">Confirmar</button>
+      </div>
+    </div>
+  </div>
+`);
+
+function mfToast(mensagem, tipo = "neutral") {
+  const regiao = document.getElementById("mfToastRegiao");
+  if (!regiao || !mensagem) return;
+  const item = document.createElement("div");
+  item.className = `mf-toast mf-toast-${tipo}`;
+  item.innerHTML = `
+    <span class="mf-toast-icon" aria-hidden="true">${tipo === "erro" ? "!" : tipo === "sucesso" ? "✓" : "•"}</span>
+    <span class="mf-toast-text"></span>
+  `;
+  item.querySelector(".mf-toast-text").textContent = mensagem;
+  regiao.appendChild(item);
+
+  requestAnimationFrame(() => item.classList.add("mf-toast-visivel"));
+
+  const remover = () => {
+    item.classList.remove("mf-toast-visivel");
+    item.classList.add("mf-toast-saindo");
+    setTimeout(() => item.remove(), 260);
+  };
+
+  const tempo = setTimeout(remover, 4200);
+  item.addEventListener("click", () => { clearTimeout(tempo); remover(); });
+}
+
+let mfDialogResolvedor = null;
+
+function mfFecharDialog(resultado) {
+  const overlay = document.getElementById("mfDialogOverlay");
+  overlay.classList.add("hidden");
+  document.getElementById("mfDialogInput").classList.add("hidden");
+  document.removeEventListener("keydown", mfDialogTeclado, true);
+  if (mfDialogResolvedor) {
+    const resolver = mfDialogResolvedor;
+    mfDialogResolvedor = null;
+    resolver(resultado);
+  }
+  if (mfDialogFocoAnterior && typeof mfDialogFocoAnterior.focus === "function") {
+    mfDialogFocoAnterior.focus();
+  }
+}
+
+function mfDialogTeclado(event) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    mfFecharDialog(document.getElementById("mfDialogInput").classList.contains("hidden") ? false : null);
+  } else if (event.key === "Tab") {
+    const focaveis = document.getElementById("mfDialogCard").querySelectorAll("button, input");
+    const lista = Array.from(focaveis);
+    if (!lista.length) return;
+    const primeiro = lista[0];
+    const ultimo = lista[lista.length - 1];
+    if (event.shiftKey && document.activeElement === primeiro) {
+      event.preventDefault();
+      ultimo.focus();
+    } else if (!event.shiftKey && document.activeElement === ultimo) {
+      event.preventDefault();
+      primeiro.focus();
+    }
+  }
+}
+
+let mfDialogFocoAnterior = null;
+
+function mfAbrirDialog({ titulo, texto, tipo = "confirm", danger = false, valorInicial = "" }) {
+  return new Promise(resolve => {
+    mfDialogResolvedor = resolve;
+    mfDialogFocoAnterior = document.activeElement;
+
+    const overlay = document.getElementById("mfDialogOverlay");
+    const card = document.getElementById("mfDialogCard");
+    const input = document.getElementById("mfDialogInput");
+    const botaoConfirmar = document.getElementById("mfDialogConfirmar");
+    const botaoCancelar = document.getElementById("mfDialogCancelar");
+    const icone = document.getElementById("mfDialogIcone");
+
+    document.getElementById("mfDialogTitulo").textContent = titulo || "";
+    document.getElementById("mfDialogTexto").textContent = texto || "";
+    icone.textContent = danger ? "!" : "?";
+    card.classList.toggle("mf-dialog-danger", !!danger);
+    botaoConfirmar.className = danger ? "danger" : "";
+    botaoConfirmar.textContent = danger ? "Excluir" : "Confirmar";
+    botaoCancelar.classList.remove("hidden");
+
+    if (tipo === "prompt") {
+      input.classList.remove("hidden");
+      input.value = valorInicial;
+      botaoConfirmar.textContent = "Adicionar";
+    } else {
+      input.classList.add("hidden");
+    }
+
+    overlay.classList.remove("hidden");
+    document.addEventListener("keydown", mfDialogTeclado, true);
+
+    (tipo === "prompt" ? input : botaoConfirmar).focus();
+
+    botaoConfirmar.onclick = () => {
+      if (tipo === "prompt") {
+        mfFecharDialog(input.value);
+      } else {
+        mfFecharDialog(true);
+      }
+    };
+    botaoCancelar.onclick = () => mfFecharDialog(tipo === "prompt" ? null : false);
+    overlay.onclick = event => {
+      if (event.target === overlay) mfFecharDialog(tipo === "prompt" ? null : false);
+    };
+  });
+}
+
+function mfConfirm(texto, { titulo = "Confirmar ação", danger = true } = {}) {
+  return mfAbrirDialog({ titulo, texto, tipo: "confirm", danger });
+}
+
+function mfPrompt(texto, { titulo = "Informe um valor", valorInicial = "" } = {}) {
+  return mfAbrirDialog({ titulo, texto, tipo: "prompt", danger: false, valorInicial });
+}
+
+/* Cores estáveis por grupo (hash determinístico), com mapeamento
+   privilegiado para nomes comuns como Streaming, Estudos, Moradia etc. */
+const MF_PALETA_GRUPOS = [
+  { bg: "#e7f2ea", fg: "#1d704c", dot: "#31a46f" },
+  { bg: "#fdf1e0", fg: "#8a5a12", dot: "#c99b43" },
+  { bg: "#eef1fb", fg: "#3949ab", dot: "#5c6bc0" },
+  { bg: "#fdeaea", fg: "#a63d35", dot: "#c96257" },
+  { bg: "#eaf6f4", fg: "#0f766e", dot: "#14b8a6" },
+  { bg: "#f3ecf9", fg: "#6b3fa0", dot: "#9b6fd1" },
+  { bg: "#fdeef6", fg: "#a3346f", dot: "#d16aa0" },
+  { bg: "#eef6ea", fg: "#4d7c0f", dot: "#84b13a" }
+];
+
+const MF_GRUPOS_COMUNS = {
+  "streaming": 2,
+  "estudos": 1,
+  "educação": 1,
+  "educacao": 1,
+  "faculdade": 1,
+  "moradia": 4,
+  "aluguel": 4,
+  "casa": 4,
+  "assinaturas": 5,
+  "saúde": 3,
+  "saude": 3,
+  "transporte": 6,
+  "lazer": 7
+};
+
+function corParaGrupo(nome) {
+  const chave = String(nome || "").trim().toLocaleLowerCase("pt-BR");
+  if (chave in MF_GRUPOS_COMUNS) return MF_PALETA_GRUPOS[MF_GRUPOS_COMUNS[chave]];
+  let hash = 0;
+  for (let i = 0; i < chave.length; i++) hash = (hash * 31 + chave.charCodeAt(i)) >>> 0;
+  return MF_PALETA_GRUPOS[hash % MF_PALETA_GRUPOS.length];
+}
+
+/* Seletor customizado e acessível — substitui a aparência nativa do
+   <select> mantendo o elemento original como fonte de valor para o
+   restante do script (contrato de dados preservado). */
+const MF_SELECTS_REALCADOS = new Map();
+
+function mfRealcarSelect(selectId, { comCor = false } = {}) {
+  const select = document.getElementById(selectId);
+  if (!select || MF_SELECTS_REALCADOS.has(selectId)) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "select-custom";
+  select.parentNode.insertBefore(wrapper, select);
+  select.classList.add("select-native-oculto");
+  select.tabIndex = -1;
+  select.setAttribute("aria-hidden", "true");
+  wrapper.appendChild(select);
+
+  const listboxId = `${selectId}Listbox`;
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.id = `${selectId}Trigger`;
+  trigger.className = "select-trigger";
+  trigger.setAttribute("aria-haspopup", "listbox");
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.setAttribute("aria-controls", listboxId);
+
+  const rotulo = document.querySelector(`label[for="${selectId}"]`);
+  if (rotulo) {
+    if (!rotulo.id) rotulo.id = `${selectId}Label`;
+    rotulo.setAttribute("for", trigger.id);
+    trigger.setAttribute("aria-labelledby", rotulo.id);
+  }
+  trigger.innerHTML = `
+    <span class="select-trigger-content">${comCor ? '<span class="select-trigger-dot" aria-hidden="true"></span>' : ""}<span class="select-trigger-label"></span></span>
+    <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  `;
+  wrapper.appendChild(trigger);
+
+  const listbox = document.createElement("ul");
+  listbox.className = "select-listbox hidden";
+  listbox.id = listboxId;
+  listbox.setAttribute("role", "listbox");
+  listbox.tabIndex = -1;
+  wrapper.appendChild(listbox);
+
+  let indiceAtivo = -1;
+
+  function opcoes() {
+    return Array.from(select.options);
+  }
+
+  function fechar({ focoTrigger = false } = {}) {
+    listbox.classList.add("hidden");
+    trigger.setAttribute("aria-expanded", "false");
+    listbox.removeAttribute("aria-activedescendant");
+    indiceAtivo = -1;
+    if (focoTrigger) trigger.focus();
+    document.removeEventListener("click", aoClicarFora, true);
+  }
+
+  function aoClicarFora(event) {
+    if (!wrapper.contains(event.target)) fechar();
+  }
+
+  function selecionar(valor) {
+    if (select.value !== valor) {
+      select.value = valor;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    render();
+    fechar({ focoTrigger: true });
+  }
+
+  function definirAtivo(indice) {
+    const itens = listbox.querySelectorAll(".select-option");
+    itens.forEach(item => item.classList.remove("select-option-ativa"));
+    if (indice >= 0 && itens[indice]) {
+      itens[indice].classList.add("select-option-ativa");
+      listbox.setAttribute("aria-activedescendant", itens[indice].id);
+      itens[indice].scrollIntoView({ block: "nearest" });
+    }
+    indiceAtivo = indice;
+  }
+
+  function abrir() {
+    render();
+    listbox.classList.remove("hidden");
+    trigger.setAttribute("aria-expanded", "true");
+    const atual = opcoes().findIndex(o => o.value === select.value);
+    definirAtivo(atual >= 0 ? atual : 0);
+    listbox.focus();
+    document.addEventListener("click", aoClicarFora, true);
+  }
+
+  function render() {
+    const itens = opcoes();
+    listbox.innerHTML = itens.map((opt, indice) => {
+      const cor = comCor && opt.value ? corParaGrupo(opt.textContent) : null;
+      const ponto = comCor
+        ? `<span class="select-option-dot" style="background:${cor ? cor.dot : "#b7c2bb"}" aria-hidden="true"></span>`
+        : "";
+      return `<li role="option" id="${listboxId}-opt-${indice}" class="select-option${opt.value === select.value ? " select-option-selecionada" : ""}" aria-selected="${opt.value === select.value}" data-valor="${escaparHTML(opt.value)}">${ponto}<span>${escaparHTML(opt.textContent)}</span></li>`;
+    }).join("");
+
+    listbox.querySelectorAll(".select-option").forEach(item => {
+      item.addEventListener("click", () => selecionar(item.dataset.valor));
+    });
+
+    const selecionada = itens.find(o => o.value === select.value) || itens[0];
+    trigger.querySelector(".select-trigger-label").textContent = selecionada ? selecionada.textContent : "";
+    if (comCor) {
+      const pontoTrigger = trigger.querySelector(".select-trigger-dot");
+      if (pontoTrigger) {
+        const cor = selecionada && selecionada.value ? corParaGrupo(selecionada.textContent) : null;
+        pontoTrigger.style.background = cor ? cor.dot : "#b7c2bb";
+      }
+    }
+  }
+
+  trigger.addEventListener("click", () => {
+    if (listbox.classList.contains("hidden")) abrir(); else fechar();
+  });
+
+  trigger.addEventListener("keydown", event => {
+    if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
+      event.preventDefault();
+      abrir();
+    }
+  });
+
+  listbox.addEventListener("keydown", event => {
+    const itens = opcoes();
+    if (event.key === "Escape") {
+      event.preventDefault();
+      fechar({ focoTrigger: true });
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      definirAtivo(Math.min(indiceAtivo + 1, itens.length - 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      definirAtivo(Math.max(indiceAtivo - 1, 0));
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      definirAtivo(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      definirAtivo(itens.length - 1);
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (itens[indiceAtivo]) selecionar(itens[indiceAtivo].value);
+    } else if (event.key === "Tab") {
+      fechar();
+    }
+  });
+
+  render();
+
+  MF_SELECTS_REALCADOS.set(selectId, { render });
+}
+
+function mfAtualizarSelectRealcado(selectId) {
+  const realce = MF_SELECTS_REALCADOS.get(selectId);
+  if (realce) realce.render();
+}
+
+mfRealcarSelect("grupoConta", { comCor: true });
+mfRealcarSelect("filtroGrupoConta", { comCor: true });
+
 function formatarMoeda(valor) {
   return Number(valor).toLocaleString("pt-BR", {
     style: "currency",
@@ -746,14 +1092,20 @@ function mostrarAba(aba) {
   document.getElementById("abaCartoes").classList.toggle("hidden", aba !== "cartoes");
   document.getElementById("abaPlanejamento").classList.toggle("hidden", aba !== "planejamento");
 
-  const tabs = document.querySelectorAll(".tab");
-  tabs.forEach(tab => tab.classList.remove("active"));
+  document.querySelectorAll(".tab, .bottom-tab").forEach(botao => {
+    botao.classList.toggle("active", botao.dataset.aba === aba);
+  });
 
-  if (aba === "dashboard") tabs[0].classList.add("active");
-  if (aba === "lancamentos") tabs[1].classList.add("active");
-  if (aba === "contas") tabs[2].classList.add("active");
-  if (aba === "cartoes") tabs[3].classList.add("active");
-  if (aba === "planejamento") tabs[4].classList.add("active");
+  const conteudo = document.getElementById(`aba${aba.charAt(0).toUpperCase()}${aba.slice(1)}`);
+  if (conteudo && !document.body.classList.contains("reduz-movimento")) {
+    conteudo.classList.remove("aba-entrando");
+    void conteudo.offsetWidth;
+    conteudo.classList.add("aba-entrando");
+  }
+}
+
+if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  document.body.classList.add("reduz-movimento");
 }
 
 function configurarCalendarios() {
@@ -875,12 +1227,12 @@ form.addEventListener("submit", async function(e) {
   };
 
   if (!novo.categoria || !novo.descricao) {
-    alert("Preencha categoria e descrição.");
+    mfToast("Preencha categoria e descrição.");
     return;
   }
 
   if (novo.valor <= 0) {
-    alert("Digite um valor maior que zero.");
+    mfToast("Digite um valor maior que zero.");
     return;
   }
 
@@ -892,7 +1244,7 @@ form.addEventListener("submit", async function(e) {
       .eq("user_id", usuarioAtual.id);
 
     if (error) {
-      alert("Erro ao editar lançamento.");
+      mfToast("Erro ao editar lançamento.");
       return;
     }
   } else {
@@ -901,7 +1253,7 @@ form.addEventListener("submit", async function(e) {
       .insert([novo]);
 
     if (error) {
-      alert("Erro ao adicionar lançamento.");
+      mfToast("Erro ao adicionar lançamento.");
       return;
     }
   }
@@ -941,8 +1293,9 @@ function editarLancamento(id) {
 }
 
 async function remover(id) {
-  const confirmar = confirm(
-    "Tem certeza que deseja excluir este lançamento?\n\nEssa ação não poderá ser desfeita."
+  const confirmar = await mfConfirm(
+    "Essa ação não poderá ser desfeita.",
+    { titulo: "Excluir este lançamento?" }
   );
 
   if (!confirmar) return;
@@ -954,7 +1307,7 @@ async function remover(id) {
     .eq("user_id", usuarioAtual.id);
 
   if (error) {
-    alert("Erro ao excluir lançamento.");
+    mfToast("Erro ao excluir lançamento.");
     return;
   }
 
@@ -976,12 +1329,12 @@ formContaFixa.addEventListener("submit", async function(e) {
   };
 
   if (!dadosConta.nome) {
-    alert("Digite o nome da conta.");
+    mfToast("Digite o nome da conta.");
     return;
   }
 
   if (dadosConta.valor <= 0) {
-    alert("Digite um valor maior que zero.");
+    mfToast("Digite um valor maior que zero.");
     return;
   }
 
@@ -1000,7 +1353,7 @@ formContaFixa.addEventListener("submit", async function(e) {
   }
 
   if (resposta.error) {
-    alert("Erro ao salvar conta fixa.");
+    mfToast("Erro ao salvar conta fixa.");
     return;
   }
 
@@ -1010,7 +1363,7 @@ formContaFixa.addEventListener("submit", async function(e) {
   atualizarTudo();
   limparFormularioContaFixa();
 
-  alert(
+  mfToast(
     estavaEditando
       ? "Conta fixa atualizada!"
       : "Conta fixa adicionada!"
@@ -1018,7 +1371,7 @@ formContaFixa.addEventListener("submit", async function(e) {
 });
 
 async function removerContaFixa(id) {
-  if (!confirm("Deseja excluir esta conta fixa?")) return;
+  if (!(await mfConfirm("Essa ação não poderá ser desfeita.", { titulo: "Excluir esta conta fixa?" }))) return;
 
   const { error } = await supabaseClient
     .from("contas_fixas")
@@ -1027,7 +1380,7 @@ async function removerContaFixa(id) {
     .eq("user_id", usuarioAtual.id);
 
   if (error) {
-    alert("Erro ao excluir conta fixa.");
+    mfToast("Erro ao excluir conta fixa.");
     return;
   }
 
@@ -1048,14 +1401,14 @@ async function pagarContaFixa(id) {
   });
 
   if (error) {
-    alert(mensagemErro(error, "Erro ao pagar conta fixa."));
+    mfToast(mensagemErro(error, "Erro ao pagar conta fixa."));
     return;
   }
 
   await carregarDados();
   atualizarTudo();
 
-  alert("Conta paga! Ela foi adicionada nas despesas e voltou para o próximo mês.");
+  mfToast("Conta paga! Ela foi adicionada nas despesas e voltou para o próximo mês.");
 }
 
 function atualizarContasFixas() {
@@ -1115,6 +1468,7 @@ function atualizarContasFixas() {
     }
 
     const grupo = gruposContas.find(item => Number(item.id) === Number(conta.grupo_id));
+    const corGrupo = grupo ? corParaGrupo(grupo.nome) : null;
 
     const div = document.createElement("div");
 
@@ -1133,7 +1487,7 @@ div.className = contaEhDoMesAtual
         <p>${formatarMoeda(conta.valor)} • Vencimento: ${formatarData(conta.vencimento)}</p>
         <div class="bill-tags">
           <span class="status ${classeStatus}">${status}</span>
-          <span class="group-badge ${grupo ? "" : "group-badge-empty"}">${grupo ? escaparHTML(grupo.nome) : "Sem grupo"}</span>
+          <span class="group-badge ${grupo ? "" : "group-badge-empty"}"${corGrupo ? ` style="color:${corGrupo.fg};background:${corGrupo.bg}"` : ""}>${grupo ? escaparHTML(grupo.nome) : "Sem grupo"}</span>
         </div>
       </div>
 
@@ -1180,6 +1534,9 @@ function atualizarOpcoesGruposContas() {
   seletorFiltro.value = filtroAtual === "todos" || filtroAtual === "sem_grupo" || gruposContas.some(grupo => String(grupo.id) === filtroAtual)
     ? filtroAtual
     : "todos";
+
+  mfAtualizarSelectRealcado("grupoConta");
+  mfAtualizarSelectRealcado("filtroGrupoConta");
 }
 
 function mostrarPainelContasFixas(painel) {
@@ -1202,7 +1559,7 @@ document.getElementById("formGrupoConta").addEventListener("submit", async funct
   }]);
 
   if (error) {
-    alert(error.code === "23505" ? "Você já criou um grupo com esse nome." : mensagemErro(error, "Não foi possível criar o grupo."));
+    mfToast(error.code === "23505" ? "Você já criou um grupo com esse nome." : mensagemErro(error, "Não foi possível criar o grupo."));
     return;
   }
 
@@ -1219,10 +1576,10 @@ async function removerGrupoConta(id) {
   const detalhe = quantidade
     ? `\n\n${quantidade} conta${quantidade === 1 ? "" : "s"} continuar${quantidade === 1 ? "á" : "ão"} existindo como \"Sem grupo\".`
     : "";
-  if (!confirm(`Excluir o grupo \"${grupo.nome}\"?${detalhe}`)) return;
+  if (!(await mfConfirm(`Excluir o grupo "${grupo.nome}"?${detalhe}`, { titulo: "Excluir grupo" }))) return;
 
   const { error } = await supabaseClient.from("grupos_contas").delete().eq("id", id).eq("user_id", usuarioAtual.id);
-  if (error) return alert(mensagemErro(error, "Não foi possível excluir o grupo."));
+  if (error) return mfToast(mensagemErro(error, "Não foi possível excluir o grupo."));
 
   await carregarDados();
   atualizarTudo();
@@ -1242,9 +1599,10 @@ function atualizarGruposContas() {
   lista.innerHTML = gruposContas.map(grupo => {
     const contasDoGrupo = contasFixas.filter(conta => Number(conta.grupo_id) === Number(grupo.id));
     const total = contasDoGrupo.reduce((soma, conta) => soma + Number(conta.valor), 0);
+    const cor = corParaGrupo(grupo.nome);
     return `
       <article class="group-card">
-        <div class="group-card-icon">${escaparHTML(grupo.nome.slice(0, 1).toUpperCase())}</div>
+        <div class="group-card-icon" style="background:linear-gradient(145deg, ${cor.dot}, ${cor.fg})">${escaparHTML(grupo.nome.slice(0, 1).toUpperCase())}</div>
         <div class="group-card-copy">
           <span>${contasDoGrupo.length} conta${contasDoGrupo.length === 1 ? "" : "s"}</span>
           <h3>${escaparHTML(grupo.nome)}</h3>
@@ -1417,7 +1775,7 @@ document.getElementById("formMeta").addEventListener("submit", async function(e)
   const novoValor = Number(document.getElementById("valorMeta").value);
 
   if (novoValor <= 0) {
-    alert("Digite uma meta maior que zero.");
+    mfToast("Digite uma meta maior que zero.");
     return;
   }
 
@@ -1430,7 +1788,7 @@ document.getElementById("formMeta").addEventListener("submit", async function(e)
     }], { onConflict: "user_id,mes" });
 
   if (error) {
-    alert(mensagemErro(error, "Erro ao salvar meta."));
+    mfToast(mensagemErro(error, "Erro ao salvar meta."));
     return;
   }
 
@@ -1604,11 +1962,11 @@ function atualizarGrafico() {
 }
 
 async function limparTudo() {
-  if (!confirm("Tem certeza que deseja apagar todos os seus dados?")) return;
+  if (!(await mfConfirm("Essa ação não poderá ser desfeita.", { titulo: "Apagar todos os seus dados?" }))) return;
 
   const { error } = await supabaseClient.rpc("limpar_meus_dados");
   if (error) {
-    alert(mensagemErro(error, "Não foi possível apagar os dados."));
+    mfToast(mensagemErro(error, "Não foi possível apagar os dados."));
     return;
   }
 
@@ -1654,7 +2012,7 @@ async function importarDados(event) {
       throw new Error("O arquivo não possui um formato de backup válido.");
     }
 
-    if (!confirm("Os dados do arquivo serão adicionados à sua conta. Deseja continuar?")) return;
+    if (!(await mfConfirm("Os dados do arquivo serão adicionados à sua conta.", { titulo: "Importar backup?", danger: false }))) return;
 
     const nomesGruposBackup = [...new Set([
       ...(dados.gruposContas || []).map(grupo => grupo.nome),
@@ -1745,9 +2103,9 @@ async function importarDados(event) {
 
     await carregarDados();
     atualizarTudo();
-    alert("Backup importado com sucesso.");
+    mfToast("Backup importado com sucesso.");
   } catch (error) {
-    alert(mensagemErro(error, "Não foi possível importar o arquivo."));
+    mfToast(mensagemErro(error, "Não foi possível importar o arquivo."));
   }
 }
 
@@ -1855,17 +2213,17 @@ async function salvarPerfil() {
   const confirmarNovoPin = document.getElementById("perfilConfirmarPin").value;
 
   if (!nome) {
-    alert("Digite seu nome.");
+    mfToast("Digite seu nome.");
     return;
   }
 
   if (novoPin && !/^\d{4,8}$/.test(novoPin)) {
-    alert("O novo PIN deve ter entre 4 e 8 números.");
+    mfToast("O novo PIN deve ter entre 4 e 8 números.");
     return;
   }
 
   if (novoPin !== confirmarNovoPin) {
-    alert("A confirmação do novo PIN está diferente.");
+    mfToast("A confirmação do novo PIN está diferente.");
     return;
   }
 
@@ -1874,7 +2232,7 @@ async function salvarPerfil() {
 
   if (foto) {
     if (!foto.type.startsWith("image/")) {
-      alert("Selecione um arquivo de imagem.");
+      mfToast("Selecione um arquivo de imagem.");
       return;
     }
 
@@ -1885,7 +2243,7 @@ async function salvarPerfil() {
       .upload(caminho, imagem, { contentType: "image/jpeg", upsert: true });
 
     if (uploadError) {
-      alert(mensagemErro(uploadError, "Não foi possível enviar a foto."));
+      mfToast(mensagemErro(uploadError, "Não foi possível enviar a foto."));
       return;
     }
 
@@ -1931,14 +2289,14 @@ async function salvarPerfil() {
   }
 
   if (error) {
-    alert(error.message);
+    mfToast(error.message);
     return;
   }
 
   if (novoPin) {
     const { error: erroPin } = await supabaseClient.rpc("configurar_pin_acesso", { p_pin: novoPin });
     if (erroPin) {
-      alert(mensagemErro(erroPin, "O perfil foi salvo, mas não foi possível alterar o PIN."));
+      mfToast(mensagemErro(erroPin, "O perfil foi salvo, mas não foi possível alterar o PIN."));
       return;
     }
   }
@@ -1947,13 +2305,14 @@ async function salvarPerfil() {
 
   fecharPerfil();
 
-  alert("Perfil atualizado com sucesso.");
+  mfToast("Perfil atualizado com sucesso.");
 }
 
 async function excluirPerfil() {
   const publicIdExcluido = perfilAtual?.public_id;
-  const confirmar = confirm(
-    "Tem certeza que deseja excluir seu perfil e todos os seus dados financeiros?\n\nEssa ação não poderá ser desfeita."
+  const confirmar = await mfConfirm(
+    "Essa ação não poderá ser desfeita.",
+    { titulo: "Excluir perfil e todos os dados financeiros?" }
   );
 
   if (!confirmar) return;
@@ -1963,7 +2322,7 @@ async function excluirPerfil() {
   });
 
   if (error) {
-    alert(mensagemErro(error, "Não foi possível excluir sua conta."));
+    mfToast(mensagemErro(error, "Não foi possível excluir sua conta."));
     return;
   }
 
@@ -1974,7 +2333,7 @@ async function excluirPerfil() {
   if (publicIdExcluido) salvarIdsContas(idsContasLembradas().filter(id => id !== publicIdExcluido));
   await mostrarSeletorContas();
 
-  alert("Sua conta e seus dados foram excluídos.");
+  mfToast("Sua conta e seus dados foram excluídos.");
 }
 
 const formCartao = document.getElementById("formCartao");
@@ -1998,7 +2357,7 @@ formCartao.addEventListener("submit", async function(e) {
   const parcelasPagas = Number(document.getElementById("cartaoParcelasPagas").value);
 
   if (parcelasPagas > totalParcelas) {
-    alert("Parcelas pagas não pode ser maior que o total de parcelas.");
+    mfToast("Parcelas pagas não pode ser maior que o total de parcelas.");
     return;
   }
 
@@ -2030,7 +2389,7 @@ formCartao.addEventListener("submit", async function(e) {
   }
 
   if (resposta.error) {
-    alert("Erro ao salvar parcelamento.");
+    mfToast("Erro ao salvar parcelamento.");
     return;
   }
 
@@ -2041,7 +2400,7 @@ await carregarDados();
 atualizarTudo();
 limparFormularioCartao();
 
-alert(
+mfToast(
   estavaEditando
     ? "Parcelamento atualizado!"
     : "Compra parcelada adicionada!"
@@ -2200,19 +2559,20 @@ async function pagarParcelaCartao(id) {
   });
 
   if (error) {
-    alert(mensagemErro(error, "Erro ao pagar parcela."));
+    mfToast(mensagemErro(error, "Erro ao pagar parcela."));
     return;
   }
 
   await carregarDados();
   atualizarTudo();
 
-  alert("Parcela paga e adicionada aos lançamentos!");
+  mfToast("Parcela paga e adicionada aos lançamentos!");
 }
 
 async function excluirParcelamento(id) {
-  const confirmar = confirm(
-    "Deseja excluir este parcelamento?\n\nAs parcelas lançadas por ele também serão removidas dos lançamentos."
+  const confirmar = await mfConfirm(
+    "As parcelas lançadas por ele também serão removidas dos lançamentos.",
+    { titulo: "Excluir este parcelamento?" }
   );
 
   if (!confirmar) return;
@@ -2222,7 +2582,7 @@ async function excluirParcelamento(id) {
   });
 
   if (error) {
-    alert(mensagemErro(error, "Erro ao excluir parcelamento."));
+    mfToast(mensagemErro(error, "Erro ao excluir parcelamento."));
     return;
   }
 
@@ -2348,6 +2708,7 @@ function parcelasCartaoDoMesAtual() {
 function limparFormularioContaFixa() {
   formContaFixa.reset();
   document.getElementById("grupoConta").value = "";
+  mfAtualizarSelectRealcado("grupoConta");
 
   if (calendarioVencimento) {
     calendarioVencimento.setDate(hojeTexto(), true);
@@ -2374,6 +2735,7 @@ function editarContaFixa(id) {
   document.getElementById("nomeConta").value = conta.nome || "";
   document.getElementById("valorConta").value = conta.valor || "";
   document.getElementById("grupoConta").value = conta.grupo_id || "";
+  mfAtualizarSelectRealcado("grupoConta");
 
   if (calendarioVencimento) {
     calendarioVencimento.setDate(conta.vencimento, true);
@@ -2400,11 +2762,11 @@ document.getElementById("formOrcamento").addEventListener("submit", async functi
     categoria: document.getElementById("orcamentoCategoria").value.trim(),
     limite: Number(document.getElementById("orcamentoLimite").value)
   };
-  if (!dados.categoria || dados.limite <= 0) return alert("Preencha uma categoria e um limite maior que zero.");
+  if (!dados.categoria || dados.limite <= 0) return mfToast("Preencha uma categoria e um limite maior que zero.");
   const resposta = editandoOrcamentoId
     ? await supabaseClient.from("orcamentos").update(dados).eq("id", editandoOrcamentoId).eq("user_id", usuarioAtual.id)
     : await supabaseClient.from("orcamentos").insert([dados]);
-  if (resposta.error) return alert(mensagemErro(resposta.error, "Não foi possível salvar o orçamento."));
+  if (resposta.error) return mfToast(mensagemErro(resposta.error, "Não foi possível salvar o orçamento."));
   cancelarEdicaoOrcamento();
   await carregarDados();
   atualizarTudo();
@@ -2430,9 +2792,9 @@ function cancelarEdicaoOrcamento() {
 }
 
 async function removerOrcamento(id) {
-  if (!confirm("Excluir este orçamento?")) return;
+  if (!(await mfConfirm("Essa ação não poderá ser desfeita.", { titulo: "Excluir este orçamento?" }))) return;
   const { error } = await supabaseClient.from("orcamentos").delete().eq("id", id).eq("user_id", usuarioAtual.id);
-  if (error) return alert(mensagemErro(error, "Não foi possível excluir."));
+  if (error) return mfToast(mensagemErro(error, "Não foi possível excluir."));
   await carregarDados(); atualizarTudo();
 }
 
@@ -2449,11 +2811,11 @@ document.getElementById("formObjetivo").addEventListener("submit", async functio
     prazo: document.getElementById("objetivoPrazo").value || null,
     status: valorAtual >= valorAlvo ? "concluido" : "ativo"
   };
-  if (!dados.nome || valorAlvo <= 0 || valorAtual < 0) return alert("Revise os dados do objetivo.");
+  if (!dados.nome || valorAlvo <= 0 || valorAtual < 0) return mfToast("Revise os dados do objetivo.");
   const resposta = editandoObjetivoId
     ? await supabaseClient.from("objetivos_financeiros").update(dados).eq("id", editandoObjetivoId).eq("user_id", usuarioAtual.id)
     : await supabaseClient.from("objetivos_financeiros").insert([dados]);
-  if (resposta.error) return alert(mensagemErro(resposta.error, "Não foi possível salvar o objetivo."));
+  if (resposta.error) return mfToast(mensagemErro(resposta.error, "Não foi possível salvar o objetivo."));
   cancelarEdicaoObjetivo();
   await carregarDados(); atualizarTudo();
 });
@@ -2482,17 +2844,18 @@ function cancelarEdicaoObjetivo() {
 }
 
 async function aportarObjetivo(id) {
-  const valor = Number(prompt("Quanto você quer adicionar a este objetivo?"));
+  const entrada = await mfPrompt("Quanto você quer adicionar a este objetivo?", { titulo: "Novo aporte" });
+  const valor = Number(entrada);
   if (!valor || valor <= 0) return;
   const { error } = await supabaseClient.rpc("aportar_objetivo", { p_objetivo_id: id, p_valor: valor });
-  if (error) return alert(mensagemErro(error, "Não foi possível registrar o aporte."));
+  if (error) return mfToast(mensagemErro(error, "Não foi possível registrar o aporte."));
   await carregarDados(); atualizarTudo();
 }
 
 async function removerObjetivo(id) {
-  if (!confirm("Excluir este objetivo e todo o seu progresso?")) return;
+  if (!(await mfConfirm("Essa ação não poderá ser desfeita.", { titulo: "Excluir este objetivo e todo o seu progresso?" }))) return;
   const { error } = await supabaseClient.from("objetivos_financeiros").delete().eq("id", id).eq("user_id", usuarioAtual.id);
-  if (error) return alert(mensagemErro(error, "Não foi possível excluir."));
+  if (error) return mfToast(mensagemErro(error, "Não foi possível excluir."));
   await carregarDados(); atualizarTudo();
 }
 
