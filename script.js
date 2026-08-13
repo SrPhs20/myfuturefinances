@@ -106,8 +106,22 @@ document.body.insertAdjacentHTML("afterbegin", `
       <label for="pinAcesso">Digite seu PIN</label>
       <input id="pinAcesso" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" enterkeyhint="go" aria-describedby="pinMensagem" oninput="processarPin(this)" onchange="processarPin(this)" onkeydown="enviarPinComTeclado(event)" />
       <div id="pinDots" class="pin-dots" aria-hidden="true"></div>
+      <div class="pin-keypad" aria-label="Teclado numérico do PIN">
+        <button type="button" onclick="digitarNumeroPin('1')">1</button>
+        <button type="button" onclick="digitarNumeroPin('2')">2</button>
+        <button type="button" onclick="digitarNumeroPin('3')">3</button>
+        <button type="button" onclick="digitarNumeroPin('4')">4</button>
+        <button type="button" onclick="digitarNumeroPin('5')">5</button>
+        <button type="button" onclick="digitarNumeroPin('6')">6</button>
+        <button type="button" onclick="digitarNumeroPin('7')">7</button>
+        <button type="button" onclick="digitarNumeroPin('8')">8</button>
+        <button type="button" onclick="digitarNumeroPin('9')">9</button>
+        <button type="button" class="pin-key-clear" onclick="limparPinDigitado()" aria-label="Limpar PIN">Limpar</button>
+        <button type="button" onclick="digitarNumeroPin('0')">0</button>
+        <button type="button" class="pin-key-delete" onclick="apagarNumeroPin()" aria-label="Apagar último número">⌫</button>
+      </div>
       <p id="pinMensagem" class="pin-message" aria-live="polite">A entrada acontece automaticamente.</p>
-      <button id="botaoEntrarPin" class="pin-submit" type="button" onclick="enviarPinAgora()">Entrar</button>
+      <button id="botaoEntrarPin" class="pin-submit" type="button" onclick="enviarPinAgora()" disabled>Entrar</button>
     </div>
 
     <div id="pinSetup" class="pin-setup hidden">
@@ -827,6 +841,13 @@ function atualizarPontosPin(preenchidos) {
   ).join("");
 }
 
+function atualizarBotaoEntrarPin() {
+  const campo = document.getElementById("pinAcesso");
+  const botao = document.getElementById("botaoEntrarPin");
+  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
+  botao.disabled = validandoPin || campo.disabled || !tamanhoPin || campo.value.length !== tamanhoPin;
+}
+
 function abrirEntradaPin() {
   if (Number(perfilAtual?.pin_length) < 4) {
     document.getElementById("novoPinGate").focus();
@@ -842,6 +863,7 @@ function abrirEntradaPin() {
   campo.maxLength = Number(perfilAtual.pin_length);
   document.getElementById("pinMensagem").textContent = "A entrada acontece automaticamente.";
   atualizarPontosPin(0);
+  atualizarBotaoEntrarPin();
   campo.focus({ preventScroll: true });
 }
 
@@ -849,6 +871,7 @@ function processarPin(campo) {
   limitarCampoPin(campo);
   atualizarPontosPin(campo.value.length);
   clearTimeout(temporizadorEnvioPin);
+  atualizarBotaoEntrarPin();
 
   const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
   if (!validandoPin && tamanhoPin && campo.value.length === tamanhoPin) {
@@ -857,6 +880,30 @@ function processarPin(campo) {
       if (!validandoPin && campo.value === pin) validarPinComSeguranca(pin);
     }, 180);
   }
+}
+
+function digitarNumeroPin(numero) {
+  const campo = document.getElementById("pinAcesso");
+  if (campo.disabled || validandoPin) return;
+  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
+  if (!/^\d$/.test(numero) || campo.value.length >= tamanhoPin) return;
+  campo.value += numero;
+  processarPin(campo);
+}
+
+function apagarNumeroPin() {
+  const campo = document.getElementById("pinAcesso");
+  if (campo.disabled || validandoPin) return;
+  campo.value = campo.value.slice(0, -1);
+  processarPin(campo);
+}
+
+function limparPinDigitado() {
+  const campo = document.getElementById("pinAcesso");
+  if (campo.disabled || validandoPin) return;
+  campo.value = "";
+  document.getElementById("pinMensagem").textContent = "Digite seu PIN novamente.";
+  processarPin(campo);
 }
 
 async function validarPinComSeguranca(pin) {
@@ -903,6 +950,7 @@ function iniciarContagemBloqueioPin(segundos) {
       botao.disabled = false;
       campo.value = "";
       atualizarPontosPin(0);
+      atualizarBotaoEntrarPin();
       mensagem.textContent = "Digite seu PIN novamente.";
       campo.focus();
     }
@@ -931,6 +979,7 @@ async function validarPinDigitado(pin) {
     botao.disabled = false;
     campo.value = "";
     atualizarPontosPin(0);
+    atualizarBotaoEntrarPin();
     mensagem.textContent = mensagemErro(error, "Não foi possível verificar o PIN.");
     return;
   }
@@ -947,6 +996,7 @@ async function validarPinDigitado(pin) {
       botao.disabled = false;
       campo.value = "";
       atualizarPontosPin(0);
+      atualizarBotaoEntrarPin();
       mensagem.textContent = mensagemErro(erroAutenticacao, "Não foi possível abrir a conta.");
       return;
     }
@@ -961,6 +1011,7 @@ async function validarPinDigitado(pin) {
   botao.disabled = false;
   campo.value = "";
   atualizarPontosPin(0);
+  atualizarBotaoEntrarPin();
 
   if (data?.bloqueado) {
     iniciarContagemBloqueioPin(data.segundos);

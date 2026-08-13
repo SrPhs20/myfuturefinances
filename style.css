@@ -1445,6 +1445,31 @@ tbody tr:hover { background: #f4f8f3; }
   transition: transform .18s ease, background .18s ease, border-color .18s ease;
 }
 .pin-dots span.filled { border-color: #b9e4c7; background: #b9e4c7; transform: scale(1.12); }
+.pin-keypad {
+  display: none;
+  grid-template-columns: repeat(3, 64px);
+  justify-content: center;
+  gap: 9px;
+  margin: 16px auto 14px;
+}
+.pin-keypad button {
+  width: 64px;
+  height: 52px;
+  min-height: 0;
+  padding: 0;
+  color: #edf8f0;
+  border: 1px solid rgba(210, 237, 218, .18);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .075);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .045);
+  font-size: 1.15rem;
+  font-weight: 800;
+  touch-action: manipulation;
+  user-select: none;
+}
+.pin-keypad button:active { background: rgba(190, 232, 202, .2); transform: scale(.95); }
+.pin-keypad .pin-key-clear { color: #b9cfc0; font-size: .68rem; }
+.pin-keypad .pin-key-delete { color: #d7e9dc; font-size: 1.05rem; }
 .pin-message { min-height: 20px; margin: 0; color: #a8c4b2; font-size: .78rem; }
 .pin-submit {
   width: min(100%, 220px);
@@ -1456,6 +1481,19 @@ tbody tr:hover { background: #f4f8f3; }
 }
 .pin-submit:hover { background: linear-gradient(135deg, #e5f6ea, #b6e1c1); }
 .pin-submit:disabled { opacity: .65; cursor: wait; transform: none; }
+
+@media (max-width: 600px), (pointer: coarse) {
+  .pin-keypad { display: grid; }
+  .pin-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .pin-dots { margin-top: 14px; }
+}
 
 .pin-setup {
   margin-top: 24px;
