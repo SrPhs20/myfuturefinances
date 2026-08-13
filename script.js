@@ -29,6 +29,7 @@ let filtroCompromissos = "mes";
 let compromissosExpandidos = false;
 let validandoPin = false;
 let temporizadorBloqueioPin = null;
+let temporizadorEnvioPin = null;
 let contasDispositivo = [];
 let modoMigracaoConta = false;
 
@@ -103,9 +104,10 @@ document.body.insertAdjacentHTML("afterbegin", `
 
     <div id="pinPanel" class="pin-panel hidden">
       <label for="pinAcesso">Digite seu PIN</label>
-      <input id="pinAcesso" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" aria-describedby="pinMensagem" oninput="processarPin(this)" />
+      <input id="pinAcesso" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" enterkeyhint="go" aria-describedby="pinMensagem" oninput="processarPin(this)" onchange="processarPin(this)" onkeydown="enviarPinComTeclado(event)" />
       <div id="pinDots" class="pin-dots" aria-hidden="true"></div>
       <p id="pinMensagem" class="pin-message" aria-live="polite">A entrada acontece automaticamente.</p>
+      <button id="botaoEntrarPin" class="pin-submit" type="button" onclick="enviarPinAgora()">Entrar</button>
     </div>
 
     <div id="pinSetup" class="pin-setup hidden">
@@ -681,6 +683,7 @@ async function removerContaDesteAparelho(publicId, event) {
 
 function voltarParaContas() {
   clearInterval(temporizadorBloqueioPin);
+  clearTimeout(temporizadorEnvioPin);
   document.getElementById("pinAcesso").value = "";
   document.getElementById("profileGate").classList.add("hidden");
   document.getElementById("accountChooser").classList.remove("hidden");
@@ -833,26 +836,63 @@ function abrirEntradaPin() {
   document.getElementById("gateHint").classList.add("hidden");
   document.getElementById("pinPanel").classList.remove("hidden");
   const campo = document.getElementById("pinAcesso");
+  clearTimeout(temporizadorEnvioPin);
+  campo.disabled = false;
+  campo.value = "";
   campo.maxLength = Number(perfilAtual.pin_length);
+  document.getElementById("pinMensagem").textContent = "A entrada acontece automaticamente.";
+  atualizarPontosPin(0);
   campo.focus({ preventScroll: true });
 }
 
-async function processarPin(campo) {
+function processarPin(campo) {
   limitarCampoPin(campo);
   atualizarPontosPin(campo.value.length);
+  clearTimeout(temporizadorEnvioPin);
 
   const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
   if (!validandoPin && tamanhoPin && campo.value.length === tamanhoPin) {
-    await validarPinDigitado(campo.value);
+    const pin = campo.value;
+    temporizadorEnvioPin = setTimeout(() => {
+      if (!validandoPin && campo.value === pin) validarPinComSeguranca(pin);
+    }, 180);
   }
+}
+
+async function validarPinComSeguranca(pin) {
+  const pinNormalizado = String(pin || "").replace(/\D/g, "");
+  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
+  if (validandoPin || !tamanhoPin || pinNormalizado.length !== tamanhoPin) return;
+  await validarPinDigitado(pinNormalizado);
+}
+
+function enviarPinAgora() {
+  clearTimeout(temporizadorEnvioPin);
+  const campo = document.getElementById("pinAcesso");
+  limitarCampoPin(campo);
+  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
+  if (campo.value.length !== tamanhoPin) {
+    document.getElementById("pinMensagem").textContent = `Digite os ${tamanhoPin} números do seu PIN.`;
+    campo.focus();
+    return;
+  }
+  validarPinComSeguranca(campo.value);
+}
+
+function enviarPinComTeclado(event) {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  enviarPinAgora();
 }
 
 function iniciarContagemBloqueioPin(segundos) {
   clearInterval(temporizadorBloqueioPin);
   const campo = document.getElementById("pinAcesso");
+  const botao = document.getElementById("botaoEntrarPin");
   const mensagem = document.getElementById("pinMensagem");
   let restante = Math.max(1, Number(segundos) || 30);
   campo.disabled = true;
+  botao.disabled = true;
 
   const atualizar = () => {
     mensagem.textContent = `Muitas tentativas. Tente novamente em ${restante}s.`;
@@ -860,6 +900,7 @@ function iniciarContagemBloqueioPin(segundos) {
     if (restante < 0) {
       clearInterval(temporizadorBloqueioPin);
       campo.disabled = false;
+      botao.disabled = false;
       campo.value = "";
       atualizarPontosPin(0);
       mensagem.textContent = "Digite seu PIN novamente.";
@@ -873,8 +914,12 @@ function iniciarContagemBloqueioPin(segundos) {
 
 async function validarPinDigitado(pin) {
   validandoPin = true;
+  clearTimeout(temporizadorEnvioPin);
   const campo = document.getElementById("pinAcesso");
+  const botao = document.getElementById("botaoEntrarPin");
   const mensagem = document.getElementById("pinMensagem");
+  campo.disabled = true;
+  botao.disabled = true;
   mensagem.textContent = "Verificando…";
 
   let data;
@@ -882,6 +927,8 @@ async function validarPinDigitado(pin) {
     data = await chamarAcessoPerfis({ action: "login", public_id: perfilAtual.public_id, pin });
   } catch (error) {
     validandoPin = false;
+    campo.disabled = false;
+    botao.disabled = false;
     campo.value = "";
     atualizarPontosPin(0);
     mensagem.textContent = mensagemErro(error, "Não foi possível verificar o PIN.");
@@ -896,6 +943,8 @@ async function validarPinDigitado(pin) {
     });
     if (erroAutenticacao || !autenticacao.user) {
       validandoPin = false;
+      campo.disabled = false;
+      botao.disabled = false;
       campo.value = "";
       atualizarPontosPin(0);
       mensagem.textContent = mensagemErro(erroAutenticacao, "Não foi possível abrir a conta.");
@@ -908,6 +957,8 @@ async function validarPinDigitado(pin) {
   }
 
   validandoPin = false;
+  campo.disabled = false;
+  botao.disabled = false;
   campo.value = "";
   atualizarPontosPin(0);
 
