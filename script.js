@@ -9,6 +9,7 @@ let usuarioAtual = null;
 let lancamentos = [];
 let contasFixas = [];
 let gruposContas = [];
+let cartoes = [];
 let metaMensal = 0;
 let metasMensais = [];
 let perfilAtual = null;
@@ -23,13 +24,13 @@ let calendarioVencimento;
 let editandoCartaoId = null;
 let calendarioCartaoPrimeiraParcela;
 let editandoContaFixaId = null;
+let editandoCartaoRegistradoId = null;
 let editandoOrcamentoId = null;
 let editandoObjetivoId = null;
 let filtroCompromissos = "mes";
 let compromissosExpandidos = false;
 let validandoPin = false;
 let temporizadorBloqueioPin = null;
-let temporizadorEnvioPin = null;
 let contasDispositivo = [];
 let modoMigracaoConta = false;
 
@@ -104,24 +105,9 @@ document.body.insertAdjacentHTML("afterbegin", `
 
     <div id="pinPanel" class="pin-panel hidden">
       <label for="pinAcesso">Digite seu PIN</label>
-      <input id="pinAcesso" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" enterkeyhint="go" aria-describedby="pinMensagem" oninput="processarPin(this)" onchange="processarPin(this)" onkeydown="enviarPinComTeclado(event)" />
+      <input id="pinAcesso" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" aria-describedby="pinMensagem" oninput="processarPin(this)" />
       <div id="pinDots" class="pin-dots" aria-hidden="true"></div>
-      <div class="pin-keypad" aria-label="Teclado numérico do PIN">
-        <button type="button" onclick="digitarNumeroPin('1')">1</button>
-        <button type="button" onclick="digitarNumeroPin('2')">2</button>
-        <button type="button" onclick="digitarNumeroPin('3')">3</button>
-        <button type="button" onclick="digitarNumeroPin('4')">4</button>
-        <button type="button" onclick="digitarNumeroPin('5')">5</button>
-        <button type="button" onclick="digitarNumeroPin('6')">6</button>
-        <button type="button" onclick="digitarNumeroPin('7')">7</button>
-        <button type="button" onclick="digitarNumeroPin('8')">8</button>
-        <button type="button" onclick="digitarNumeroPin('9')">9</button>
-        <button type="button" class="pin-key-clear" onclick="limparPinDigitado()" aria-label="Limpar PIN">Limpar</button>
-        <button type="button" onclick="digitarNumeroPin('0')">0</button>
-        <button type="button" class="pin-key-delete" onclick="apagarNumeroPin()" aria-label="Apagar último número">⌫</button>
-      </div>
       <p id="pinMensagem" class="pin-message" aria-live="polite">A entrada acontece automaticamente.</p>
-      <button id="botaoEntrarPin" class="pin-submit" type="button" onclick="enviarPinAgora()" disabled>Entrar</button>
     </div>
 
     <div id="pinSetup" class="pin-setup hidden">
@@ -572,6 +558,8 @@ function mfAtualizarSelectRealcado(selectId) {
 
 mfRealcarSelect("grupoConta", { comCor: true });
 mfRealcarSelect("filtroGrupoConta", { comCor: true });
+mfRealcarSelect("cartaoContaFixa", { comCor: true });
+mfRealcarSelect("cartaoParcelaId", { comCor: true });
 
 function formatarMoeda(valor) {
   return Number(valor).toLocaleString("pt-BR", {
@@ -697,7 +685,6 @@ async function removerContaDesteAparelho(publicId, event) {
 
 function voltarParaContas() {
   clearInterval(temporizadorBloqueioPin);
-  clearTimeout(temporizadorEnvioPin);
   document.getElementById("pinAcesso").value = "";
   document.getElementById("profileGate").classList.add("hidden");
   document.getElementById("accountChooser").classList.remove("hidden");
@@ -841,13 +828,6 @@ function atualizarPontosPin(preenchidos) {
   ).join("");
 }
 
-function atualizarBotaoEntrarPin() {
-  const campo = document.getElementById("pinAcesso");
-  const botao = document.getElementById("botaoEntrarPin");
-  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
-  botao.disabled = validandoPin || campo.disabled || !tamanhoPin || campo.value.length !== tamanhoPin;
-}
-
 function abrirEntradaPin() {
   if (Number(perfilAtual?.pin_length) < 4) {
     document.getElementById("novoPinGate").focus();
@@ -857,89 +837,26 @@ function abrirEntradaPin() {
   document.getElementById("gateHint").classList.add("hidden");
   document.getElementById("pinPanel").classList.remove("hidden");
   const campo = document.getElementById("pinAcesso");
-  clearTimeout(temporizadorEnvioPin);
-  campo.disabled = false;
-  campo.value = "";
   campo.maxLength = Number(perfilAtual.pin_length);
-  document.getElementById("pinMensagem").textContent = "A entrada acontece automaticamente.";
-  atualizarPontosPin(0);
-  atualizarBotaoEntrarPin();
   campo.focus({ preventScroll: true });
 }
 
-function processarPin(campo) {
+async function processarPin(campo) {
   limitarCampoPin(campo);
   atualizarPontosPin(campo.value.length);
-  clearTimeout(temporizadorEnvioPin);
-  atualizarBotaoEntrarPin();
 
   const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
   if (!validandoPin && tamanhoPin && campo.value.length === tamanhoPin) {
-    const pin = campo.value;
-    temporizadorEnvioPin = setTimeout(() => {
-      if (!validandoPin && campo.value === pin) validarPinComSeguranca(pin);
-    }, 180);
+    await validarPinDigitado(campo.value);
   }
-}
-
-function digitarNumeroPin(numero) {
-  const campo = document.getElementById("pinAcesso");
-  if (campo.disabled || validandoPin) return;
-  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
-  if (!/^\d$/.test(numero) || campo.value.length >= tamanhoPin) return;
-  campo.value += numero;
-  processarPin(campo);
-}
-
-function apagarNumeroPin() {
-  const campo = document.getElementById("pinAcesso");
-  if (campo.disabled || validandoPin) return;
-  campo.value = campo.value.slice(0, -1);
-  processarPin(campo);
-}
-
-function limparPinDigitado() {
-  const campo = document.getElementById("pinAcesso");
-  if (campo.disabled || validandoPin) return;
-  campo.value = "";
-  document.getElementById("pinMensagem").textContent = "Digite seu PIN novamente.";
-  processarPin(campo);
-}
-
-async function validarPinComSeguranca(pin) {
-  const pinNormalizado = String(pin || "").replace(/\D/g, "");
-  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
-  if (validandoPin || !tamanhoPin || pinNormalizado.length !== tamanhoPin) return;
-  await validarPinDigitado(pinNormalizado);
-}
-
-function enviarPinAgora() {
-  clearTimeout(temporizadorEnvioPin);
-  const campo = document.getElementById("pinAcesso");
-  limitarCampoPin(campo);
-  const tamanhoPin = Number(perfilAtual?.pin_length) || 0;
-  if (campo.value.length !== tamanhoPin) {
-    document.getElementById("pinMensagem").textContent = `Digite os ${tamanhoPin} números do seu PIN.`;
-    campo.focus();
-    return;
-  }
-  validarPinComSeguranca(campo.value);
-}
-
-function enviarPinComTeclado(event) {
-  if (event.key !== "Enter") return;
-  event.preventDefault();
-  enviarPinAgora();
 }
 
 function iniciarContagemBloqueioPin(segundos) {
   clearInterval(temporizadorBloqueioPin);
   const campo = document.getElementById("pinAcesso");
-  const botao = document.getElementById("botaoEntrarPin");
   const mensagem = document.getElementById("pinMensagem");
   let restante = Math.max(1, Number(segundos) || 30);
   campo.disabled = true;
-  botao.disabled = true;
 
   const atualizar = () => {
     mensagem.textContent = `Muitas tentativas. Tente novamente em ${restante}s.`;
@@ -947,10 +864,8 @@ function iniciarContagemBloqueioPin(segundos) {
     if (restante < 0) {
       clearInterval(temporizadorBloqueioPin);
       campo.disabled = false;
-      botao.disabled = false;
       campo.value = "";
       atualizarPontosPin(0);
-      atualizarBotaoEntrarPin();
       mensagem.textContent = "Digite seu PIN novamente.";
       campo.focus();
     }
@@ -962,12 +877,8 @@ function iniciarContagemBloqueioPin(segundos) {
 
 async function validarPinDigitado(pin) {
   validandoPin = true;
-  clearTimeout(temporizadorEnvioPin);
   const campo = document.getElementById("pinAcesso");
-  const botao = document.getElementById("botaoEntrarPin");
   const mensagem = document.getElementById("pinMensagem");
-  campo.disabled = true;
-  botao.disabled = true;
   mensagem.textContent = "Verificando…";
 
   let data;
@@ -975,11 +886,8 @@ async function validarPinDigitado(pin) {
     data = await chamarAcessoPerfis({ action: "login", public_id: perfilAtual.public_id, pin });
   } catch (error) {
     validandoPin = false;
-    campo.disabled = false;
-    botao.disabled = false;
     campo.value = "";
     atualizarPontosPin(0);
-    atualizarBotaoEntrarPin();
     mensagem.textContent = mensagemErro(error, "Não foi possível verificar o PIN.");
     return;
   }
@@ -992,11 +900,8 @@ async function validarPinDigitado(pin) {
     });
     if (erroAutenticacao || !autenticacao.user) {
       validandoPin = false;
-      campo.disabled = false;
-      botao.disabled = false;
       campo.value = "";
       atualizarPontosPin(0);
-      atualizarBotaoEntrarPin();
       mensagem.textContent = mensagemErro(erroAutenticacao, "Não foi possível abrir a conta.");
       return;
     }
@@ -1007,11 +912,8 @@ async function validarPinDigitado(pin) {
   }
 
   validandoPin = false;
-  campo.disabled = false;
-  botao.disabled = false;
   campo.value = "";
   atualizarPontosPin(0);
-  atualizarBotaoEntrarPin();
 
   if (data?.bloqueado) {
     iniciarContagemBloqueioPin(data.segundos);
@@ -1136,7 +1038,7 @@ async function iniciarApp({ bloquear = true } = {}) {
   }
 }
 async function carregarDados() {
-  const [resLancamentos, resContas, resGruposContas, resMetas, resCartoes, resOrcamentos, resObjetivos] = await Promise.all([
+  const [resLancamentos, resContas, resGruposContas, resCartoesRegistrados, resMetas, resCartoes, resOrcamentos, resObjetivos] = await Promise.all([
     supabaseClient
       .from("lancamentos")
       .select("*")
@@ -1149,6 +1051,11 @@ async function carregarDados() {
       .order("vencimento", { ascending: true }),
     supabaseClient
       .from("grupos_contas")
+      .select("*")
+      .eq("user_id", usuarioAtual.id)
+      .order("nome", { ascending: true }),
+    supabaseClient
+      .from("cartoes")
       .select("*")
       .eq("user_id", usuarioAtual.id)
       .order("nome", { ascending: true }),
@@ -1171,7 +1078,7 @@ async function carregarDados() {
       .order("created_at", { ascending: false })
   ]);
 
-  const erro = resLancamentos.error || resContas.error || resGruposContas.error || resMetas.error || resCartoes.error || resOrcamentos.error || resObjetivos.error;
+  const erro = resLancamentos.error || resContas.error || resGruposContas.error || resCartoesRegistrados.error || resMetas.error || resCartoes.error || resOrcamentos.error || resObjetivos.error;
   if (erro) {
     throw new Error(mensagemErro(erro, "Não foi possível carregar seus dados."));
   }
@@ -1179,6 +1086,7 @@ async function carregarDados() {
   lancamentos = resLancamentos.data || [];
   contasFixas = resContas.data || [];
   gruposContas = resGruposContas.data || [];
+  cartoes = resCartoesRegistrados.data || [];
   metasMensais = resMetas.data || [];
   metaMensal = Number(metasMensais.find(meta => meta.mes === primeiroDiaMesAtual())?.valor || 0);
   cartoesParcelados = resCartoes.data || [];
@@ -1427,6 +1335,9 @@ formContaFixa.addEventListener("submit", async function(e) {
     grupo_id: document.getElementById("grupoConta").value
       ? Number(document.getElementById("grupoConta").value)
       : null,
+    cartao_id: document.getElementById("cartaoContaFixa").value
+      ? Number(document.getElementById("cartaoContaFixa").value)
+      : null,
     user_id: usuarioAtual.id
   };
 
@@ -1518,6 +1429,7 @@ function atualizarContasFixas() {
   listaContas.innerHTML = "";
 
   atualizarOpcoesGruposContas();
+  atualizarOpcoesCartoes();
 
   const filtroGrupo = document.getElementById("filtroGrupoConta")?.value || "todos";
   const contasFiltradas = contasFixas.filter(conta => {
@@ -1571,6 +1483,7 @@ function atualizarContasFixas() {
 
     const grupo = gruposContas.find(item => Number(item.id) === Number(conta.grupo_id));
     const corGrupo = grupo ? corParaGrupo(grupo.nome) : null;
+    const cartaoVinculado = cartoes.find(item => Number(item.id) === Number(conta.cartao_id));
 
     const div = document.createElement("div");
 
@@ -1590,6 +1503,7 @@ div.className = contaEhDoMesAtual
         <div class="bill-tags">
           <span class="status ${classeStatus}">${status}</span>
           <span class="group-badge ${grupo ? "" : "group-badge-empty"}"${corGrupo ? ` style="color:${corGrupo.fg};background:${corGrupo.bg}"` : ""}>${grupo ? escaparHTML(grupo.nome) : "Sem grupo"}</span>
+          ${cartaoVinculado ? `<span class="group-badge card-badge">Cartão · ${escaparHTML(cartaoVinculado.nome)}</span>` : ""}
         </div>
       </div>
 
@@ -1639,6 +1553,32 @@ function atualizarOpcoesGruposContas() {
 
   mfAtualizarSelectRealcado("grupoConta");
   mfAtualizarSelectRealcado("filtroGrupoConta");
+}
+
+function atualizarOpcoesCartoes() {
+  const seletorContaFixa = document.getElementById("cartaoContaFixa");
+  const seletorParcela = document.getElementById("cartaoParcelaId");
+  if (!seletorContaFixa || !seletorParcela) return;
+
+  const contaFixaAtual = seletorContaFixa.value;
+  const parcelaAtual = seletorParcela.value;
+  const opcoes = cartoes.map(cartao =>
+    `<option value="${cartao.id}">${escaparHTML(cartao.nome)}${cartao.final ? ` • final ${escaparHTML(cartao.final)}` : ""}</option>`
+  ).join("");
+
+  seletorContaFixa.innerHTML = `<option value="">Pago em dinheiro, Pix ou débito</option>${opcoes}`;
+  seletorParcela.innerHTML = `<option value="">Selecione um cartão</option>${opcoes}`;
+
+  seletorContaFixa.value = cartoes.some(cartao => String(cartao.id) === contaFixaAtual) ? contaFixaAtual : "";
+  seletorParcela.value = cartoes.some(cartao => String(cartao.id) === parcelaAtual) ? parcelaAtual : "";
+
+  const aviso = document.getElementById("avisoSemCartaoParcela");
+  const botaoCartao = document.getElementById("botaoCartao");
+  if (aviso) aviso.classList.toggle("hidden", cartoes.length > 0);
+  if (botaoCartao) botaoCartao.disabled = cartoes.length === 0;
+
+  mfAtualizarSelectRealcado("cartaoContaFixa");
+  mfAtualizarSelectRealcado("cartaoParcelaId");
 }
 
 function mostrarPainelContasFixas(painel) {
@@ -2452,8 +2392,22 @@ if (botaoCancelarEdicaoCartao) {
   });
 }
 
+document.getElementById("cartaoParcelaId").addEventListener("change", function() {
+  const cartaoSelecionado = cartoes.find(item => String(item.id) === String(this.value));
+  const campoVencimento = document.getElementById("cartaoDiaVencimento");
+  if (cartaoSelecionado && !campoVencimento.value) {
+    campoVencimento.value = cartaoSelecionado.dia_vencimento;
+  }
+});
+
 formCartao.addEventListener("submit", async function(e) {
   e.preventDefault();
+
+  const cartaoSelecionado = cartoes.find(item => String(item.id) === String(document.getElementById("cartaoParcelaId").value));
+  if (!cartaoSelecionado) {
+    mfToast("Selecione um cartão cadastrado.");
+    return;
+  }
 
   const totalParcelas = Number(document.getElementById("cartaoTotalParcelas").value);
   const parcelasPagas = Number(document.getElementById("cartaoParcelasPagas").value);
@@ -2465,14 +2419,15 @@ formCartao.addEventListener("submit", async function(e) {
 
   const dadosParcelamento = {
     user_id: usuarioAtual.id,
-    cartao_nome: document.getElementById("cartaoNome").value.trim(),
-    cartao_final: document.getElementById("cartaoFinal").value.trim(),
+    cartao_id: cartaoSelecionado.id,
+    cartao_nome: cartaoSelecionado.nome,
+    cartao_final: cartaoSelecionado.final || "",
     descricao: document.getElementById("cartaoDescricao").value.trim(),
     valor_total: Number(document.getElementById("cartaoValorTotal").value),
     total_parcelas: totalParcelas,
     parcelas_pagas: parcelasPagas,
     data_primeira_parcela: document.getElementById("cartaoDataPrimeiraParcela").value,
-    dia_vencimento: Number(document.getElementById("cartaoDiaVencimento").value),
+    dia_vencimento: Number(document.getElementById("cartaoDiaVencimento").value) || Number(cartaoSelecionado.dia_vencimento),
     status: parcelasPagas >= totalParcelas ? "quitado" : "ativo"
   };
 
@@ -2714,6 +2669,8 @@ function calcularProximoVencimento(item) {
 
 function limparFormularioCartao() {
   document.getElementById("formCartao").reset();
+  document.getElementById("cartaoParcelaId").value = "";
+  mfAtualizarSelectRealcado("cartaoParcelaId");
 
   if (calendarioCartaoPrimeiraParcela) {
     calendarioCartaoPrimeiraParcela.setDate(hojeTexto(), true);
@@ -2729,8 +2686,8 @@ function cancelarEdicaoCartao() {
 
   editandoCartaoId = null;
 
-  document.getElementById("cartaoNome").value = "";
-  document.getElementById("cartaoFinal").value = "";
+  document.getElementById("cartaoParcelaId").value = "";
+  mfAtualizarSelectRealcado("cartaoParcelaId");
   document.getElementById("cartaoDescricao").value = "";
   document.getElementById("cartaoValorTotal").value = "";
   document.getElementById("cartaoTotalParcelas").value = "";
@@ -2759,8 +2716,8 @@ function editarParcelamento(id) {
 
   editandoCartaoId = id;
 
-  document.getElementById("cartaoNome").value = item.cartao_nome || "";
-  document.getElementById("cartaoFinal").value = item.cartao_final || "";
+  document.getElementById("cartaoParcelaId").value = item.cartao_id || "";
+  mfAtualizarSelectRealcado("cartaoParcelaId");
   document.getElementById("cartaoDescricao").value = item.descricao || "";
   document.getElementById("cartaoValorTotal").value = item.valor_total || "";
   document.getElementById("cartaoTotalParcelas").value = item.total_parcelas || "";
@@ -2777,11 +2734,146 @@ function editarParcelamento(id) {
   document.getElementById("cancelarEdicaoCartao").classList.remove("hidden");
 
   mostrarAba("cartoes");
+  mostrarPainelCartoes("parcelamentos");
 
   document.getElementById("formCartao").scrollIntoView({
     behavior: "smooth",
     block: "start"
   });
+}
+
+function mostrarPainelCartoes(painel) {
+  const exibindoCartoes = painel === "cartoes";
+  document.getElementById("painelParcelamentosCartao").classList.toggle("hidden", exibindoCartoes);
+  document.getElementById("painelMeusCartoes").classList.toggle("hidden", !exibindoCartoes);
+  document.getElementById("tabPainelParcelamentos").classList.toggle("active", !exibindoCartoes);
+  document.getElementById("tabPainelMeusCartoes").classList.toggle("active", exibindoCartoes);
+  if (exibindoCartoes) atualizarCartoesRegistrados();
+}
+
+document.getElementById("formNovoCartao").addEventListener("submit", async function(event) {
+  event.preventDefault();
+
+  const dadosCartao = {
+    user_id: usuarioAtual.id,
+    nome: document.getElementById("novoCartaoNome").value.trim(),
+    final: document.getElementById("novoCartaoFinal").value.trim(),
+    dia_vencimento: Number(document.getElementById("novoCartaoVencimento").value)
+  };
+
+  if (!dadosCartao.nome) {
+    mfToast("Digite o nome do cartão.");
+    return;
+  }
+  if (!(dadosCartao.dia_vencimento >= 1 && dadosCartao.dia_vencimento <= 31)) {
+    mfToast("Informe um dia de vencimento entre 1 e 31.");
+    return;
+  }
+
+  const resposta = editandoCartaoRegistradoId
+    ? await supabaseClient.from("cartoes").update(dadosCartao).eq("id", editandoCartaoRegistradoId).eq("user_id", usuarioAtual.id)
+    : await supabaseClient.from("cartoes").insert([dadosCartao]);
+
+  if (resposta.error) {
+    mfToast(resposta.error.code === "23505" ? "Você já cadastrou um cartão com esse nome." : mensagemErro(resposta.error, "Não foi possível salvar o cartão."));
+    return;
+  }
+
+  const estavaEditando = !!editandoCartaoRegistradoId;
+  cancelarEdicaoCartaoRegistrado();
+  await carregarDados();
+  atualizarTudo();
+  mostrarPainelCartoes("cartoes");
+  mfToast(estavaEditando ? "Cartão atualizado!" : "Cartão cadastrado!");
+});
+
+function editarCartaoRegistrado(id) {
+  const cartao = cartoes.find(item => Number(item.id) === Number(id));
+  if (!cartao) return;
+
+  editandoCartaoRegistradoId = id;
+  document.getElementById("novoCartaoNome").value = cartao.nome || "";
+  document.getElementById("novoCartaoFinal").value = cartao.final || "";
+  document.getElementById("novoCartaoVencimento").value = cartao.dia_vencimento || "";
+  document.getElementById("tituloFormNovoCartao").textContent = "Editar cartão";
+  document.getElementById("botaoNovoCartao").textContent = "Salvar alterações";
+  document.getElementById("cancelarEdicaoCartaoRegistrado").classList.remove("hidden");
+
+  document.getElementById("formNovoCartao").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelarEdicaoCartaoRegistrado() {
+  editandoCartaoRegistradoId = null;
+  document.getElementById("formNovoCartao").reset();
+  document.getElementById("tituloFormNovoCartao").textContent = "Cadastrar um cartão";
+  document.getElementById("botaoNovoCartao").textContent = "Cadastrar cartão";
+  document.getElementById("cancelarEdicaoCartaoRegistrado").classList.add("hidden");
+}
+
+document.getElementById("cancelarEdicaoCartaoRegistrado").addEventListener("click", function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  cancelarEdicaoCartaoRegistrado();
+});
+
+async function removerCartaoRegistrado(id) {
+  const cartao = cartoes.find(item => Number(item.id) === Number(id));
+  if (!cartao) return;
+
+  const contasVinculadas = contasFixas.filter(conta => Number(conta.cartao_id) === Number(id)).length;
+  const parcelasVinculadas = cartoesParcelados.filter(item => Number(item.cartao_id) === Number(id)).length;
+  const detalhes = [
+    contasVinculadas ? `${contasVinculadas} conta${contasVinculadas === 1 ? "" : "s"} fixa${contasVinculadas === 1 ? "" : "s"}` : null,
+    parcelasVinculadas ? `${parcelasVinculadas} compra${parcelasVinculadas === 1 ? "" : "s"} parcelada${parcelasVinculadas === 1 ? "" : "s"}` : null
+  ].filter(Boolean).join(" e ");
+  const aviso = detalhes ? `\n\n${detalhes} vinculada(s) a este cartão vão continuar existindo, apenas sem cartão associado.` : "";
+
+  if (!(await mfConfirm(`Excluir o cartão "${cartao.nome}"?${aviso}`, { titulo: "Excluir cartão" }))) return;
+
+  const { error } = await supabaseClient.from("cartoes").delete().eq("id", id).eq("user_id", usuarioAtual.id);
+  if (error) return mfToast(mensagemErro(error, "Não foi possível excluir o cartão."));
+
+  await carregarDados();
+  atualizarTudo();
+  mostrarPainelCartoes("cartoes");
+}
+
+function atualizarCartoesRegistrados() {
+  const lista = document.getElementById("listaCartoesRegistrados");
+  if (!lista) return;
+  const resumo = document.getElementById("resumoCartoesRegistrados");
+  if (resumo) resumo.textContent = `${cartoes.length} cartão${cartoes.length === 1 ? "" : "ões"}`;
+
+  if (!cartoes.length) {
+    lista.innerHTML = '<p class="empty-state">Nenhum cartão cadastrado. Cadastre o cartão que você usa no dia a dia para organizar assinaturas e compras parceladas.</p>';
+    return;
+  }
+
+  lista.innerHTML = cartoes.map(cartao => {
+    const contasVinculadas = contasFixas.filter(conta => Number(conta.cartao_id) === Number(cartao.id));
+    const totalMensal = contasVinculadas.reduce((total, conta) => total + Number(conta.valor), 0);
+    const parcelasVinculadas = cartoesParcelados.filter(item => Number(item.cartao_id) === Number(cartao.id) && Number(item.parcelas_pagas) < Number(item.total_parcelas));
+    const totalParcelasAberto = parcelasVinculadas.reduce((total, item) => {
+      const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
+      const restantes = Number(item.total_parcelas) - Number(item.parcelas_pagas);
+      return total + valorParcela * restantes;
+    }, 0);
+    const cor = corParaGrupo(cartao.nome);
+    return `
+      <article class="group-card card-registrado">
+        <div class="group-card-icon" style="background:linear-gradient(145deg, ${cor.dot}, ${cor.fg})">${escaparHTML(cartao.nome.slice(0, 1).toUpperCase())}</div>
+        <div class="group-card-copy">
+          <span>Fatura vence dia ${cartao.dia_vencimento}${cartao.final ? ` • final ${escaparHTML(cartao.final)}` : ""}</span>
+          <h3>${escaparHTML(cartao.nome)}</h3>
+          <strong>${formatarMoeda(totalMensal)} <small>/ mês em contas fixas</small></strong>
+          <small>${contasVinculadas.length} conta${contasVinculadas.length === 1 ? "" : "s"} fixa${contasVinculadas.length === 1 ? "" : "s"} vinculada${contasVinculadas.length === 1 ? "" : "s"} • ${formatarMoeda(totalParcelasAberto)} em parcelas abertas</small>
+        </div>
+        <div class="card-registrado-actions">
+          <button type="button" class="card-registrado-edit-button" onclick="editarCartaoRegistrado(${cartao.id})">Editar</button>
+          <button type="button" class="group-delete-button" onclick="removerCartaoRegistrado(${cartao.id})" aria-label="Excluir cartão ${escaparHTML(cartao.nome)}">Excluir</button>
+        </div>
+      </article>`;
+  }).join("");
 }
 
 function parcelasCartaoDoMes(mesReferencia = hojeTexto().slice(0, 7)) {
@@ -2811,6 +2903,8 @@ function limparFormularioContaFixa() {
   formContaFixa.reset();
   document.getElementById("grupoConta").value = "";
   mfAtualizarSelectRealcado("grupoConta");
+  document.getElementById("cartaoContaFixa").value = "";
+  mfAtualizarSelectRealcado("cartaoContaFixa");
 
   if (calendarioVencimento) {
     calendarioVencimento.setDate(hojeTexto(), true);
@@ -2838,6 +2932,8 @@ function editarContaFixa(id) {
   document.getElementById("valorConta").value = conta.valor || "";
   document.getElementById("grupoConta").value = conta.grupo_id || "";
   mfAtualizarSelectRealcado("grupoConta");
+  document.getElementById("cartaoContaFixa").value = conta.cartao_id || "";
+  mfAtualizarSelectRealcado("cartaoContaFixa");
 
   if (calendarioVencimento) {
     calendarioVencimento.setDate(conta.vencimento, true);
@@ -2991,6 +3087,7 @@ function atualizarTudo() {
   atualizarContasFixas();
   atualizarGruposContas();
   atualizarCartoes();
+  atualizarCartoesRegistrados();
   atualizarDashboard();
   atualizarPlanejamento();
 }

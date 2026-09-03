@@ -331,34 +331,6 @@ tbody tr:hover {
   border-color: #2563eb;
 }
 
-.flatpickr-day.today {
-  border-color: #2563eb;
-}
-
-.flatpickr-months .flatpickr-month {
-  background: #2563eb;
-  color: white;
-}
-
-.flatpickr-current-month .flatpickr-monthDropdown-months,
-.flatpickr-current-month input.cur-year {
-  color: white;
-}
-
-.flatpickr-weekdays {
-  background: #2563eb;
-}
-
-span.flatpickr-weekday {
-  color: white;
-}
-
-.flatpickr-prev-month,
-.flatpickr-next-month {
-  color: white;
-  fill: white;
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -568,37 +540,6 @@ span.flatpickr-weekday {
   padding: 9px 12px;
   font-size: 14px;
   margin: 0;
-}
-
-.auth-screen {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 420px;
-  background: rgba(255, 255, 255, 0.92);
-  padding: 28px;
-  border-radius: 22px;
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
-  display: grid;
-  gap: 12px;
-}
-
-.auth-card h1 {
-  margin: 0;
-}
-
-.auth-card p {
-  color: #64748b;
-}
-
-#authMensagem {
-  font-weight: 700;
-  color: #2563eb;
 }
 
 .user-bar {
@@ -953,6 +894,7 @@ button {
   min-height: 42px;
   padding: 10px 13px;
   border-radius: 11px;
+  font-family: inherit;
   font-size: .92rem;
 }
 
@@ -1242,6 +1184,16 @@ tbody tr:hover { background: #f4f8f3; }
 .group-delete-button { position: absolute; top: 11px; right: 11px; width: auto; min-height: 30px; padding: 5px 8px; color: #9b4941; border: 0; background: transparent; box-shadow: none; font-size: .68rem; }
 .group-delete-button:hover { color: #7f302a; background: #f8eae7; box-shadow: none; transform: none; }
 
+/* Cartões cadastrados: reaproveita o visual dos cards de grupo, com um
+   segundo botão (Editar) ao lado do excluir. */
+.card-registrado-actions { position: absolute; top: 11px; right: 11px; display: flex; gap: 2px; }
+.card-registrado-actions .group-delete-button { position: static; }
+.card-registrado-edit-button { width: auto; min-height: 30px; padding: 5px 8px; color: var(--emerald-700); border: 0; background: transparent; box-shadow: none; font-size: .68rem; }
+.card-registrado-edit-button:hover { color: var(--forest-950); background: var(--mint-100); box-shadow: none; transform: none; }
+.card-registrado .group-card-copy h3 { margin-right: 92px; }
+.group-badge.card-badge { border-color: #d8cdee; background: #f3ecf9; color: #6b3fa0; }
+.group-badge.card-badge::before { background: #9b6fd1; }
+
 @media (max-width: 820px) {
   .fixed-account-form { grid-template-columns: 1fr 1fr; }
   .group-create-form { grid-template-columns: 1fr; }
@@ -1445,55 +1397,7 @@ tbody tr:hover { background: #f4f8f3; }
   transition: transform .18s ease, background .18s ease, border-color .18s ease;
 }
 .pin-dots span.filled { border-color: #b9e4c7; background: #b9e4c7; transform: scale(1.12); }
-.pin-keypad {
-  display: none;
-  grid-template-columns: repeat(3, 64px);
-  justify-content: center;
-  gap: 9px;
-  margin: 16px auto 14px;
-}
-.pin-keypad button {
-  width: 64px;
-  height: 52px;
-  min-height: 0;
-  padding: 0;
-  color: #edf8f0;
-  border: 1px solid rgba(210, 237, 218, .18);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, .075);
-  box-shadow: inset 0 1px rgba(255, 255, 255, .045);
-  font-size: 1.15rem;
-  font-weight: 800;
-  touch-action: manipulation;
-  user-select: none;
-}
-.pin-keypad button:active { background: rgba(190, 232, 202, .2); transform: scale(.95); }
-.pin-keypad .pin-key-clear { color: #b9cfc0; font-size: .68rem; }
-.pin-keypad .pin-key-delete { color: #d7e9dc; font-size: 1.05rem; }
 .pin-message { min-height: 20px; margin: 0; color: #a8c4b2; font-size: .78rem; }
-.pin-submit {
-  width: min(100%, 220px);
-  min-height: 44px;
-  margin: 14px auto 0;
-  color: var(--forest-950);
-  background: linear-gradient(135deg, #d9efdf, #a6d7b4);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, .18);
-}
-.pin-submit:hover { background: linear-gradient(135deg, #e5f6ea, #b6e1c1); }
-.pin-submit:disabled { opacity: .65; cursor: wait; transform: none; }
-
-@media (max-width: 600px), (pointer: coarse) {
-  .pin-keypad { display: grid; }
-  .pin-input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    opacity: 0;
-    pointer-events: none;
-  }
-  .pin-dots { margin-top: 14px; }
-}
 
 .pin-setup {
   margin-top: 24px;

@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=16" />
+  <link rel="stylesheet" href="style.css?v=18" />
 </head>
 <body>
   <div class="container">
@@ -297,6 +297,13 @@
             </select>
           </div>
 
+          <div class="form-field">
+            <label for="cartaoContaFixa">Pago com cartão <span class="optional-label">opcional</span></label>
+            <select id="cartaoContaFixa">
+              <option value="">Pago em dinheiro, Pix ou débito</option>
+            </select>
+          </div>
+
           <div class="fixed-form-actions">
             <button id="botaoContaFixa" type="submit">Adicionar conta fixa</button>
             <button type="button" class="secondary hidden" id="cancelarEdicaoContaFixa">Cancelar edição</button>
@@ -372,44 +379,82 @@
     </div>
   </div>
 
-  <form id="formCartao">
-    <label>Nome do cartão</label>
-    <input id="cartaoNome" type="text" placeholder="Ex. Nubank, Itaú, Inter" required />
+  <div class="fixed-workspace-tabs" role="tablist" aria-label="Organização dos cartões">
+    <button type="button" class="fixed-workspace-tab active" id="tabPainelParcelamentos" onclick="mostrarPainelCartoes('parcelamentos')">Parcelamentos</button>
+    <button type="button" class="fixed-workspace-tab" id="tabPainelMeusCartoes" onclick="mostrarPainelCartoes('cartoes')">Meus cartões</button>
+  </div>
 
-    <label>Final do cartão</label>
-    <input id="cartaoFinal" type="text" maxlength="4" placeholder="Ex. 1234" />
+  <div id="painelParcelamentosCartao">
+    <form id="formCartao">
+      <label for="cartaoParcelaId">Cartão</label>
+      <select id="cartaoParcelaId" required>
+        <option value="">Selecione um cartão</option>
+      </select>
+      <p class="empty-state hidden" id="avisoSemCartaoParcela">Você ainda não cadastrou nenhum cartão. Abra a aba "Meus cartões" e cadastre um antes de adicionar uma compra parcelada.</p>
 
-    <label>Descrição da compra</label>
-    <input id="cartaoDescricao" type="text" placeholder="Ex. Notebook, Celular, Curso" required />
+      <label>Descrição da compra</label>
+      <input id="cartaoDescricao" type="text" placeholder="Ex. Notebook, Celular, Curso" required />
 
-    <label>Valor total da compra</label>
-    <input id="cartaoValorTotal" type="number" step="0.01" placeholder="Ex. 3000,00" required />
+      <label>Valor total da compra</label>
+      <input id="cartaoValorTotal" type="number" step="0.01" placeholder="Ex. 3000,00" required />
 
-    <label>Total de parcelas</label>
-    <input id="cartaoTotalParcelas" type="number" min="1" placeholder="Ex. 10" required />
+      <label>Total de parcelas</label>
+      <input id="cartaoTotalParcelas" type="number" min="1" placeholder="Ex. 10" required />
 
-    <label>Parcelas já pagas</label>
-    <input id="cartaoParcelasPagas" type="number" min="0" placeholder="Ex. 3" value="0" required />
+      <label>Parcelas já pagas</label>
+      <input id="cartaoParcelasPagas" type="number" min="0" placeholder="Ex. 3" value="0" required />
 
-    <label>Data da primeira parcela</label>
-    <input id="cartaoDataPrimeiraParcela" type="date" required />
+      <label>Data da primeira parcela</label>
+      <input id="cartaoDataPrimeiraParcela" type="date" required />
 
-    <label>Dia de vencimento da fatura</label>
-    <input id="cartaoDiaVencimento" type="number" min="1" max="31" placeholder="Ex. 10" required />
+      <label>Dia de vencimento da fatura</label>
+      <input id="cartaoDiaVencimento" type="number" min="1" max="31" placeholder="Ex. 10" required />
 
-    <button id="botaoCartao" type="submit">Adicionar compra parcelada</button>
-<button
-  type="button"
-  class="secondary hidden"
-  id="cancelarEdicaoCartao"
->
-  Cancelar edição
-</button>
-  </form>
+      <button id="botaoCartao" type="submit">Adicionar compra parcelada</button>
+      <button type="button" class="secondary hidden" id="cancelarEdicaoCartao">Cancelar edição</button>
+    </form>
 
-  <div class="chart">
-    <h2>Minhas compras parceladas</h2>
-    <div id="listaCartoes"></div>
+    <div class="chart">
+      <h2>Minhas compras parceladas</h2>
+      <div id="listaCartoes"></div>
+    </div>
+  </div>
+
+  <div id="painelMeusCartoes" class="hidden">
+    <form id="formNovoCartao" class="group-create-form">
+      <div>
+        <span class="eyebrow">Organize por cartão</span>
+        <h2 id="tituloFormNovoCartao">Cadastrar um cartão</h2>
+        <p>Cadastre seus cartões para vincular assinaturas, contas fixas pagas neles e compras parceladas.</p>
+      </div>
+      <div class="group-create-fields">
+        <div class="form-field">
+          <label for="novoCartaoNome">Nome do cartão</label>
+          <input id="novoCartaoNome" type="text" maxlength="60" placeholder="Ex. Nubank, Itaú, Inter" required />
+        </div>
+        <div class="form-field">
+          <label for="novoCartaoFinal">Final <span class="optional-label">opcional</span></label>
+          <input id="novoCartaoFinal" type="text" maxlength="4" placeholder="Ex. 1234" />
+        </div>
+        <div class="form-field">
+          <label for="novoCartaoVencimento">Dia de vencimento da fatura</label>
+          <input id="novoCartaoVencimento" type="number" min="1" max="31" placeholder="Ex. 10" required />
+        </div>
+        <button id="botaoNovoCartao" type="submit">Cadastrar cartão</button>
+        <button type="button" class="secondary hidden" id="cancelarEdicaoCartaoRegistrado">Cancelar edição</button>
+      </div>
+    </form>
+
+    <div class="chart groups-chart">
+      <div class="fixed-list-heading">
+        <div>
+          <span class="eyebrow">Cadastrados</span>
+          <h2>Meus cartões</h2>
+        </div>
+        <span class="soft-pill" id="resumoCartoesRegistrados">0 cartões</span>
+      </div>
+      <div id="listaCartoesRegistrados" class="groups-grid"></div>
+    </div>
   </div>
 </section>
 
