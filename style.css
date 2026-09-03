@@ -1194,6 +1194,62 @@ tbody tr:hover { background: #f4f8f3; }
 .group-badge.card-badge { border-color: #d8cdee; background: #f3ecf9; color: #6b3fa0; }
 .group-badge.card-badge::before { background: #9b6fd1; }
 
+/* Ações rápidas da aba Cartões: abrem/fecham os formulários recolhidos de
+   "novo cartão" e "nova compra parcelada" sem trocar de aba. */
+.card-actions-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 20px; }
+.card-actions-row button { width: auto; }
+
+/* Galeria visual dos cartões cadastrados: um "cartão de verdade" por
+   cadastro, com cor inspirada na marca do banco, final, vencimento e o
+   limite usado/disponível logo abaixo. */
+.cartoes-visuais-chart { margin-bottom: 20px; }
+.cartoes-visual-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
+.cartoes-visual-grid > .empty-state { grid-column: 1 / -1; }
+
+.cartao-visual-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fffef9, #f3f8f3);
+}
+
+.cartao-visual {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  aspect-ratio: 1.586 / 1;
+  padding: 18px;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px -12px rgba(11, 43, 30, .45);
+  overflow: hidden;
+}
+.cartao-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 85% -10%, rgba(255, 255, 255, .28), transparent 55%);
+  pointer-events: none;
+}
+.cartao-visual-top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.cartao-visual-banco { font-size: .92rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+.cartao-visual-chip { flex-shrink: 0; width: 34px; height: 24px; border-radius: 6px; background: linear-gradient(145deg, rgba(255, 255, 255, .85), rgba(255, 255, 255, .4)); }
+.cartao-visual-numero { position: relative; margin: 14px 0; font-family: "Courier New", monospace; font-size: 1.05rem; letter-spacing: .12em; }
+.cartao-visual-bottom { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; opacity: .92; }
+.cartao-visual-bottom span:first-child { overflow: hidden; max-width: 60%; text-overflow: ellipsis; white-space: nowrap; }
+
+.cartao-visual-info { display: flex; flex-direction: column; gap: 8px; }
+.cartao-visual-info-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.cartao-visual-info-top span { display: block; color: #76887e; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.cartao-visual-info-top strong { display: block; margin-top: 2px; color: var(--forest-950); font-size: 1.05rem; }
+.cartao-visual-info-top small { color: #819087; font-size: .67rem; }
+.cartao-visual-info-top .card-registrado-actions { position: static; flex-shrink: 0; display: flex; gap: 2px; }
+.cartao-visual-info-top .card-registrado-actions .group-delete-button { position: static; }
+.cartao-visual-detalhe { color: #819087; font-size: .68rem; }
+
 @media (max-width: 820px) {
   .fixed-account-form { grid-template-columns: 1fr 1fr; }
   .group-create-form { grid-template-columns: 1fr; }
@@ -1211,6 +1267,9 @@ tbody tr:hover { background: #f4f8f3; }
   .group-create-fields { grid-template-columns: 1fr; }
   .group-create-fields button { width: 100%; }
   .groups-grid { grid-template-columns: 1fr; }
+  .card-actions-row { flex-direction: column; }
+  .card-actions-row button { width: 100%; }
+  .cartoes-visual-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 420px) {

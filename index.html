@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=19" />
 </head>
 <body>
   <div class="container">
@@ -379,18 +379,48 @@
     </div>
   </div>
 
-  <div class="fixed-workspace-tabs" role="tablist" aria-label="Organização dos cartões">
-    <button type="button" class="fixed-workspace-tab active" id="tabPainelParcelamentos" onclick="mostrarPainelCartoes('parcelamentos')">Parcelamentos</button>
-    <button type="button" class="fixed-workspace-tab" id="tabPainelMeusCartoes" onclick="mostrarPainelCartoes('cartoes')">Meus cartões</button>
+  <div class="card-actions-row">
+    <button type="button" class="secondary" id="botaoAlternarNovoCartao">+ Novo cartão</button>
+    <button type="button" class="secondary" id="botaoAlternarNovaCompra">+ Nova compra parcelada</button>
   </div>
 
-  <div id="painelParcelamentosCartao">
+  <div id="blocoNovoCartao" class="chart hidden">
+    <form id="formNovoCartao" class="group-create-form">
+      <div>
+        <span class="eyebrow">Organize por cartão</span>
+        <h2 id="tituloFormNovoCartao">Cadastrar um cartão</h2>
+        <p>Cadastre seus cartões para vincular assinaturas, contas fixas pagas neles e compras parceladas.</p>
+      </div>
+      <div class="group-create-fields">
+        <div class="form-field">
+          <label for="novoCartaoNome">Nome do cartão</label>
+          <input id="novoCartaoNome" type="text" maxlength="60" placeholder="Ex. Nubank, Itaú, Inter" required />
+        </div>
+        <div class="form-field">
+          <label for="novoCartaoFinal">Final <span class="optional-label">opcional</span></label>
+          <input id="novoCartaoFinal" type="text" maxlength="4" placeholder="Ex. 1234" />
+        </div>
+        <div class="form-field">
+          <label for="novoCartaoVencimento">Dia de vencimento da fatura</label>
+          <input id="novoCartaoVencimento" type="number" min="1" max="31" placeholder="Ex. 10" required />
+        </div>
+        <div class="form-field">
+          <label for="novoCartaoLimite">Limite do cartão <span class="optional-label">opcional</span></label>
+          <input id="novoCartaoLimite" type="number" min="0" step="0.01" placeholder="Ex. 5000,00" />
+        </div>
+        <button id="botaoNovoCartao" type="submit">Cadastrar cartão</button>
+        <button type="button" class="secondary hidden" id="cancelarEdicaoCartaoRegistrado">Cancelar edição</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="blocoNovaCompra" class="chart hidden">
     <form id="formCartao">
       <label for="cartaoParcelaId">Cartão</label>
       <select id="cartaoParcelaId" required>
         <option value="">Selecione um cartão</option>
       </select>
-      <p class="empty-state hidden" id="avisoSemCartaoParcela">Você ainda não cadastrou nenhum cartão. Abra a aba "Meus cartões" e cadastre um antes de adicionar uma compra parcelada.</p>
+      <p class="empty-state hidden" id="avisoSemCartaoParcela">Você ainda não cadastrou nenhum cartão. Clique em "+ Novo cartão" e cadastre um antes de adicionar uma compra parcelada.</p>
 
       <label>Descrição da compra</label>
       <input id="cartaoDescricao" type="text" placeholder="Ex. Notebook, Celular, Curso" required />
@@ -413,48 +443,22 @@
       <button id="botaoCartao" type="submit">Adicionar compra parcelada</button>
       <button type="button" class="secondary hidden" id="cancelarEdicaoCartao">Cancelar edição</button>
     </form>
-
-    <div class="chart">
-      <h2>Minhas compras parceladas</h2>
-      <div id="listaCartoes"></div>
-    </div>
   </div>
 
-  <div id="painelMeusCartoes" class="hidden">
-    <form id="formNovoCartao" class="group-create-form">
+  <div class="chart cartoes-visuais-chart">
+    <div class="fixed-list-heading">
       <div>
-        <span class="eyebrow">Organize por cartão</span>
-        <h2 id="tituloFormNovoCartao">Cadastrar um cartão</h2>
-        <p>Cadastre seus cartões para vincular assinaturas, contas fixas pagas neles e compras parceladas.</p>
+        <span class="eyebrow">Meus cartões</span>
+        <h2>Cartões cadastrados</h2>
       </div>
-      <div class="group-create-fields">
-        <div class="form-field">
-          <label for="novoCartaoNome">Nome do cartão</label>
-          <input id="novoCartaoNome" type="text" maxlength="60" placeholder="Ex. Nubank, Itaú, Inter" required />
-        </div>
-        <div class="form-field">
-          <label for="novoCartaoFinal">Final <span class="optional-label">opcional</span></label>
-          <input id="novoCartaoFinal" type="text" maxlength="4" placeholder="Ex. 1234" />
-        </div>
-        <div class="form-field">
-          <label for="novoCartaoVencimento">Dia de vencimento da fatura</label>
-          <input id="novoCartaoVencimento" type="number" min="1" max="31" placeholder="Ex. 10" required />
-        </div>
-        <button id="botaoNovoCartao" type="submit">Cadastrar cartão</button>
-        <button type="button" class="secondary hidden" id="cancelarEdicaoCartaoRegistrado">Cancelar edição</button>
-      </div>
-    </form>
-
-    <div class="chart groups-chart">
-      <div class="fixed-list-heading">
-        <div>
-          <span class="eyebrow">Cadastrados</span>
-          <h2>Meus cartões</h2>
-        </div>
-        <span class="soft-pill" id="resumoCartoesRegistrados">0 cartões</span>
-      </div>
-      <div id="listaCartoesRegistrados" class="groups-grid"></div>
+      <span class="soft-pill" id="resumoCartoesRegistrados">0 cartões</span>
     </div>
+    <div id="listaCartoesRegistrados" class="cartoes-visual-grid"></div>
+  </div>
+
+  <div class="chart">
+    <h2>Minhas compras parceladas</h2>
+    <div id="listaCartoes"></div>
   </div>
 </section>
 
@@ -526,6 +530,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=16"></script>
+  <script src="script.js?v=17"></script>
 </body>
 </html>

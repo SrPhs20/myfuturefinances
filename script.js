@@ -390,6 +390,37 @@ function corParaGrupo(nome) {
   return MF_PALETA_GRUPOS[hash % MF_PALETA_GRUPOS.length];
 }
 
+/* Identidade visual dos cartões: cores inspiradas na marca de cada banco (sem
+   usar logos reais) para o cartão cadastrado parecer com o cartão de verdade
+   na galeria da aba Cartões. Se o nome não bater com nenhum banco conhecido,
+   cai de volta na paleta genérica de corParaGrupo. */
+const MF_BANCOS = [
+  { chaves: ["nubank", "nu bank", "nu,"], rotulo: "Nubank", grad: ["#8a05be", "#3d0a63"], texto: "#ffffff" },
+  { chaves: ["mercado pago", "mercadopago"], rotulo: "Mercado Pago", grad: ["#00b1ea", "#0038ff"], texto: "#ffffff" },
+  { chaves: ["banco do brasil"], rotulo: "Banco do Brasil", grad: ["#fddb00", "#003399"], texto: "#00204d" },
+  { chaves: ["itau", "itaú"], rotulo: "Itaú", grad: ["#ec7000", "#004a94"], texto: "#ffffff" },
+  { chaves: ["bradesco"], rotulo: "Bradesco", grad: ["#cc092f", "#6e0018"], texto: "#ffffff" },
+  { chaves: ["santander"], rotulo: "Santander", grad: ["#ec0000", "#7a0000"], texto: "#ffffff" },
+  { chaves: ["caixa"], rotulo: "Caixa", grad: ["#0070ad", "#003f66"], texto: "#ffffff" },
+  { chaves: ["inter"], rotulo: "Inter", grad: ["#ff7a00", "#c94a00"], texto: "#ffffff" },
+  { chaves: ["c6"], rotulo: "C6 Bank", grad: ["#2b2b2b", "#000000"], texto: "#ffffff" },
+  { chaves: ["picpay"], rotulo: "PicPay", grad: ["#21c25e", "#0f7a3a"], texto: "#ffffff" },
+  { chaves: ["pagbank", "pagseguro"], rotulo: "PagBank", grad: ["#00b2a9", "#00544f"], texto: "#ffffff" },
+  { chaves: ["will bank", "willbank"], rotulo: "Will Bank", grad: ["#7a1fa2", "#41105a"], texto: "#ffffff" },
+  { chaves: ["neon"], rotulo: "Neon", grad: ["#0043ff", "#001e80"], texto: "#ffffff" },
+  { chaves: ["next"], rotulo: "Next", grad: ["#00e08f", "#009b62"], texto: "#04331f" },
+  { chaves: ["xp"], rotulo: "XP", grad: ["#1c1c1c", "#000000"], texto: "#f2c200" },
+  { chaves: ["btg"], rotulo: "BTG Pactual", grad: ["#001e50", "#000a1f"], texto: "#ffffff" }
+];
+
+function estiloCartaoBanco(nome) {
+  const chave = String(nome || "").trim().toLocaleLowerCase("pt-BR");
+  const banco = MF_BANCOS.find(item => item.chaves.some(chaveBanco => chave.includes(chaveBanco)));
+  if (banco) return banco;
+  const cor = corParaGrupo(nome);
+  return { rotulo: null, grad: [cor.dot, cor.fg], texto: "#ffffff" };
+}
+
 /* Seletor customizado e acessível — substitui a aparência nativa do
    <select> mantendo o elemento original como fonte de valor para o
    restante do script (contrato de dados preservado). */
@@ -2456,6 +2487,7 @@ await carregarDados();
 
 atualizarTudo();
 limparFormularioCartao();
+alternarBlocoCartao("compra", false);
 
 mfToast(
   estavaEditando
@@ -2707,7 +2739,7 @@ function cancelarEdicaoCartao() {
     .getElementById("cancelarEdicaoCartao")
     .classList.add("hidden");
 
-  mostrarAba("cartoes");
+  alternarBlocoCartao("compra", false);
 }
 
 function editarParcelamento(id) {
@@ -2734,31 +2766,48 @@ function editarParcelamento(id) {
   document.getElementById("cancelarEdicaoCartao").classList.remove("hidden");
 
   mostrarAba("cartoes");
-  mostrarPainelCartoes("parcelamentos");
-
-  document.getElementById("formCartao").scrollIntoView({
-    behavior: "smooth",
-    block: "start"
-  });
+  alternarBlocoCartao("compra", true);
 }
 
-function mostrarPainelCartoes(painel) {
-  const exibindoCartoes = painel === "cartoes";
-  document.getElementById("painelParcelamentosCartao").classList.toggle("hidden", exibindoCartoes);
-  document.getElementById("painelMeusCartoes").classList.toggle("hidden", !exibindoCartoes);
-  document.getElementById("tabPainelParcelamentos").classList.toggle("active", !exibindoCartoes);
-  document.getElementById("tabPainelMeusCartoes").classList.toggle("active", exibindoCartoes);
-  if (exibindoCartoes) atualizarCartoesRegistrados();
+/* Os formulários de "novo cartão" e "nova compra parcelada" ficam
+   recolhidos dentro da própria aba Cartões — não são mais painéis
+   separados que exigem trocar de aba para ir e voltar. */
+function alternarBlocoCartao(tipo, estadoForcado) {
+  const bloco = document.getElementById(tipo === "cartao" ? "blocoNovoCartao" : "blocoNovaCompra");
+  const botao = document.getElementById(tipo === "cartao" ? "botaoAlternarNovoCartao" : "botaoAlternarNovaCompra");
+  if (!bloco) return;
+
+  const abrir = typeof estadoForcado === "boolean" ? estadoForcado : bloco.classList.contains("hidden");
+  bloco.classList.toggle("hidden", !abrir);
+  if (botao) {
+    botao.textContent = abrir
+      ? "✕ Fechar"
+      : (tipo === "cartao" ? "+ Novo cartão" : "+ Nova compra parcelada");
+  }
+  if (abrir) {
+    bloco.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
+
+document.getElementById("botaoAlternarNovoCartao").addEventListener("click", function() {
+  alternarBlocoCartao("cartao");
+});
+
+document.getElementById("botaoAlternarNovaCompra").addEventListener("click", function() {
+  alternarBlocoCartao("compra");
+});
 
 document.getElementById("formNovoCartao").addEventListener("submit", async function(event) {
   event.preventDefault();
+
+  const limiteInformado = document.getElementById("novoCartaoLimite").value;
 
   const dadosCartao = {
     user_id: usuarioAtual.id,
     nome: document.getElementById("novoCartaoNome").value.trim(),
     final: document.getElementById("novoCartaoFinal").value.trim(),
-    dia_vencimento: Number(document.getElementById("novoCartaoVencimento").value)
+    dia_vencimento: Number(document.getElementById("novoCartaoVencimento").value),
+    limite: limiteInformado !== "" ? Number(limiteInformado) : null
   };
 
   if (!dadosCartao.nome) {
@@ -2767,6 +2816,10 @@ document.getElementById("formNovoCartao").addEventListener("submit", async funct
   }
   if (!(dadosCartao.dia_vencimento >= 1 && dadosCartao.dia_vencimento <= 31)) {
     mfToast("Informe um dia de vencimento entre 1 e 31.");
+    return;
+  }
+  if (dadosCartao.limite !== null && (!Number.isFinite(dadosCartao.limite) || dadosCartao.limite < 0)) {
+    mfToast("Informe um limite válido (0 ou maior).");
     return;
   }
 
@@ -2783,7 +2836,6 @@ document.getElementById("formNovoCartao").addEventListener("submit", async funct
   cancelarEdicaoCartaoRegistrado();
   await carregarDados();
   atualizarTudo();
-  mostrarPainelCartoes("cartoes");
   mfToast(estavaEditando ? "Cartão atualizado!" : "Cartão cadastrado!");
 });
 
@@ -2795,11 +2847,12 @@ function editarCartaoRegistrado(id) {
   document.getElementById("novoCartaoNome").value = cartao.nome || "";
   document.getElementById("novoCartaoFinal").value = cartao.final || "";
   document.getElementById("novoCartaoVencimento").value = cartao.dia_vencimento || "";
+  document.getElementById("novoCartaoLimite").value = cartao.limite !== null && cartao.limite !== undefined ? cartao.limite : "";
   document.getElementById("tituloFormNovoCartao").textContent = "Editar cartão";
   document.getElementById("botaoNovoCartao").textContent = "Salvar alterações";
   document.getElementById("cancelarEdicaoCartaoRegistrado").classList.remove("hidden");
 
-  document.getElementById("formNovoCartao").scrollIntoView({ behavior: "smooth", block: "start" });
+  alternarBlocoCartao("cartao", true);
 }
 
 function cancelarEdicaoCartaoRegistrado() {
@@ -2808,6 +2861,7 @@ function cancelarEdicaoCartaoRegistrado() {
   document.getElementById("tituloFormNovoCartao").textContent = "Cadastrar um cartão";
   document.getElementById("botaoNovoCartao").textContent = "Cadastrar cartão";
   document.getElementById("cancelarEdicaoCartaoRegistrado").classList.add("hidden");
+  alternarBlocoCartao("cartao", false);
 }
 
 document.getElementById("cancelarEdicaoCartaoRegistrado").addEventListener("click", function(e) {
@@ -2835,7 +2889,6 @@ async function removerCartaoRegistrado(id) {
 
   await carregarDados();
   atualizarTudo();
-  mostrarPainelCartoes("cartoes");
 }
 
 function atualizarCartoesRegistrados() {
@@ -2845,7 +2898,7 @@ function atualizarCartoesRegistrados() {
   if (resumo) resumo.textContent = `${cartoes.length} cartão${cartoes.length === 1 ? "" : "ões"}`;
 
   if (!cartoes.length) {
-    lista.innerHTML = '<p class="empty-state">Nenhum cartão cadastrado. Cadastre o cartão que você usa no dia a dia para organizar assinaturas e compras parceladas.</p>';
+    lista.innerHTML = '<p class="empty-state">Nenhum cartão cadastrado. Clique em "+ Novo cartão" para cadastrar o cartão que você usa no dia a dia.</p>';
     return;
   }
 
@@ -2858,19 +2911,41 @@ function atualizarCartoesRegistrados() {
       const restantes = Number(item.total_parcelas) - Number(item.parcelas_pagas);
       return total + valorParcela * restantes;
     }, 0);
-    const cor = corParaGrupo(cartao.nome);
+
+    const usoTotal = totalParcelasAberto + totalMensal;
+    const banco = estiloCartaoBanco(cartao.nome);
+    const temLimite = cartao.limite !== null && cartao.limite !== undefined && cartao.limite !== "";
+    const limite = temLimite ? Number(cartao.limite) : null;
+    const disponivel = limite !== null ? Math.max(limite - usoTotal, 0) : null;
+    const percentualUso = limite ? Math.min((usoTotal / limite) * 100, 100) : 0;
+
     return `
-      <article class="group-card card-registrado">
-        <div class="group-card-icon" style="background:linear-gradient(145deg, ${cor.dot}, ${cor.fg})">${escaparHTML(cartao.nome.slice(0, 1).toUpperCase())}</div>
-        <div class="group-card-copy">
-          <span>Fatura vence dia ${cartao.dia_vencimento}${cartao.final ? ` • final ${escaparHTML(cartao.final)}` : ""}</span>
-          <h3>${escaparHTML(cartao.nome)}</h3>
-          <strong>${formatarMoeda(totalMensal)} <small>/ mês em contas fixas</small></strong>
-          <small>${contasVinculadas.length} conta${contasVinculadas.length === 1 ? "" : "s"} fixa${contasVinculadas.length === 1 ? "" : "s"} vinculada${contasVinculadas.length === 1 ? "" : "s"} • ${formatarMoeda(totalParcelasAberto)} em parcelas abertas</small>
+      <article class="cartao-visual-wrap">
+        <div class="cartao-visual" style="background:linear-gradient(135deg, ${banco.grad[0]}, ${banco.grad[1]}); color:${banco.texto};">
+          <div class="cartao-visual-top">
+            <span class="cartao-visual-banco">${escaparHTML(banco.rotulo || cartao.nome)}</span>
+            <span class="cartao-visual-chip" aria-hidden="true"></span>
+          </div>
+          <div class="cartao-visual-numero">•••• •••• •••• ${cartao.final ? escaparHTML(cartao.final) : "----"}</div>
+          <div class="cartao-visual-bottom">
+            <span>${escaparHTML(cartao.nome)}</span>
+            <span>Vence dia ${cartao.dia_vencimento}</span>
+          </div>
         </div>
-        <div class="card-registrado-actions">
-          <button type="button" class="card-registrado-edit-button" onclick="editarCartaoRegistrado(${cartao.id})">Editar</button>
-          <button type="button" class="group-delete-button" onclick="removerCartaoRegistrado(${cartao.id})" aria-label="Excluir cartão ${escaparHTML(cartao.nome)}">Excluir</button>
+        <div class="cartao-visual-info">
+          <div class="cartao-visual-info-top">
+            <div>
+              ${temLimite
+                ? `<span>Limite disponível</span><strong>${formatarMoeda(disponivel)}</strong><small>de ${formatarMoeda(limite)} • usado ${formatarMoeda(usoTotal)}</small>`
+                : `<span>Em uso neste cartão</span><strong>${formatarMoeda(usoTotal)}</strong><small>Edite o cartão para definir um limite</small>`}
+            </div>
+            <div class="card-registrado-actions">
+              <button type="button" class="card-registrado-edit-button" onclick="editarCartaoRegistrado(${cartao.id})">Editar</button>
+              <button type="button" class="group-delete-button" onclick="removerCartaoRegistrado(${cartao.id})" aria-label="Excluir cartão ${escaparHTML(cartao.nome)}">Excluir</button>
+            </div>
+          </div>
+          ${temLimite ? `<div class="meta-bar"><div class="meta-fill" style="width:${percentualUso}%"></div></div>` : ""}
+          <small class="cartao-visual-detalhe">${contasVinculadas.length} conta${contasVinculadas.length === 1 ? "" : "s"} fixa${contasVinculadas.length === 1 ? "" : "s"} (${formatarMoeda(totalMensal)}/mês) • ${parcelasVinculadas.length} parcelamento${parcelasVinculadas.length === 1 ? "" : "s"} em aberto</small>
         </div>
       </article>`;
   }).join("");
