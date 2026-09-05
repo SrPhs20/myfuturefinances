@@ -1091,6 +1091,12 @@ tbody tr:hover { background: #f4f8f3; }
 
 .form-field { display: grid; align-content: start; gap: 7px; }
 .form-field label { margin: 0; }
+/* Campo que precisa da linha inteira para si (ex.: "Pago com cartão" na
+   última posição do formulário de contas fixas) — sem isso, ele fica
+   sozinho numa linha estreita e o menu que abre por cima acaba mais
+   estreito que os botões "Adicionar/Cancelar" logo abaixo, deixando
+   pedaços do botão aparecendo ao lado do menu aberto. */
+.campo-largura-total { grid-column: 1 / -1; }
 .optional-label {
   margin-left: 5px;
   padding: 2px 6px;
@@ -1756,7 +1762,7 @@ body.reduz-movimento .aba-entrando { animation: none; }
   border: 0;
 }
 
-.select-custom { position: relative; width: 100%; }
+.select-custom { position: relative; z-index: 1; width: 100%; isolation: isolate; }
 
 .select-trigger {
   width: 100%;
@@ -1792,7 +1798,7 @@ body.reduz-movimento .aba-entrando { animation: none; }
 
 .select-listbox {
   position: absolute;
-  z-index: 60;
+  z-index: 550;
   top: calc(100% + 6px);
   left: 0;
   right: 0;
