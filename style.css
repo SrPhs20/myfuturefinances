@@ -1796,12 +1796,16 @@ body.reduz-movimento .aba-entrando { animation: none; }
 .select-chevron { width: 17px; height: 17px; flex: 0 0 17px; color: #7c8d82; transition: transform .18s ease; }
 .select-trigger[aria-expanded="true"] .select-chevron { transform: rotate(180deg); color: var(--emerald-600); }
 
+/* position:fixed (não absolute) + coordenadas calculadas em JS
+   (posicionarListbox em script.js): assim o menu "flutua" sobre a página
+   inteira e nunca fica escondido atrás de outro cartão/seção, não importa
+   onde o campo esteja na tela. */
 .select-listbox {
-  position: absolute;
+  position: fixed;
   z-index: 550;
-  top: calc(100% + 6px);
+  top: 0;
   left: 0;
-  right: 0;
+  right: auto;
   max-height: 264px;
   overflow-y: auto;
   margin: 0;

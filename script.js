@@ -480,10 +480,36 @@ function mfRealcarSelect(selectId, { comCor = false } = {}) {
     indiceAtivo = -1;
     if (focoTrigger) trigger.focus();
     document.removeEventListener("click", aoClicarFora, true);
+    window.removeEventListener("scroll", posicionarListbox, true);
+    window.removeEventListener("resize", posicionarListbox);
   }
 
   function aoClicarFora(event) {
     if (!wrapper.contains(event.target)) fechar();
+  }
+
+  /* O menu abre "flutuando" com position:fixed calculado via JS (em vez de
+     absolute preso ao formulário) — assim ele nunca fica escondido atrás de
+     outro cartão/seção da página, não importa onde o campo esteja na tela. */
+  function posicionarListbox() {
+    const rect = trigger.getBoundingClientRect();
+    const alturaMaxima = 264;
+    const espacoAbaixo = window.innerHeight - rect.bottom;
+    const espacoAcima = rect.top;
+    const abrirParaCima = espacoAbaixo < alturaMaxima + 12 && espacoAcima > espacoAbaixo;
+
+    listbox.style.left = `${rect.left}px`;
+    listbox.style.width = `${rect.width}px`;
+
+    if (abrirParaCima) {
+      listbox.style.top = "auto";
+      listbox.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+      listbox.style.maxHeight = `${Math.max(Math.min(espacoAcima - 12, alturaMaxima), 120)}px`;
+    } else {
+      listbox.style.bottom = "auto";
+      listbox.style.top = `${rect.bottom + 6}px`;
+      listbox.style.maxHeight = `${Math.max(Math.min(espacoAbaixo - 12, alturaMaxima), 120)}px`;
+    }
   }
 
   function selecionar(valor) {
@@ -510,10 +536,13 @@ function mfRealcarSelect(selectId, { comCor = false } = {}) {
     render();
     listbox.classList.remove("hidden");
     trigger.setAttribute("aria-expanded", "true");
+    posicionarListbox();
     const atual = opcoes().findIndex(o => o.value === select.value);
     definirAtivo(atual >= 0 ? atual : 0);
     listbox.focus();
     document.addEventListener("click", aoClicarFora, true);
+    window.addEventListener("scroll", posicionarListbox, true);
+    window.addEventListener("resize", posicionarListbox);
   }
 
   function render() {

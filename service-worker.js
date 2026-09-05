@@ -1,5 +1,5 @@
-const CACHE_NAME = "my-future-finances-v20";
-const APP_SHELL = ["/", "/index.html", "/style.css?v=20", "/script.js?v=17", "/manifest.json", "/icon.svg"];
+const CACHE_NAME = "my-future-finances-v21";
+const APP_SHELL = ["/", "/index.html", "/style.css?v=21", "/script.js?v=18", "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
