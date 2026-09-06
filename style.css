@@ -1187,6 +1187,12 @@ tbody tr:hover { background: #f4f8f3; }
 .group-card-copy h3 { overflow: hidden; margin: 2px 54px 5px 0; color: var(--forest-950); font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
 .group-card-copy strong { color: var(--emerald-700); font-size: 1.02rem; }
 .group-card-copy small { color: #819087; font-size: .67rem; }
+.group-card-resumo-contas { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Grupos de contas (aba "Meus grupos") ficam clicáveis: clicar leva para
+   Contas Fixas já filtrado por aquele grupo. */
+.group-card-clicavel { cursor: pointer; transition: border-color .15s ease, transform .1s ease; }
+.group-card-clicavel:hover { border-color: #9ebba6; transform: translateY(-2px); }
+.group-card-clicavel:focus-visible { outline: 3px solid rgba(49, 164, 111, .28); outline-offset: 2px; }
 .group-delete-button { position: absolute; top: 11px; right: 11px; width: auto; min-height: 30px; padding: 5px 8px; color: #9b4941; border: 0; background: transparent; box-shadow: none; font-size: .68rem; }
 .group-delete-button:hover { color: #7f302a; background: #f8eae7; box-shadow: none; transform: none; }
 
@@ -1796,12 +1802,12 @@ body.reduz-movimento .aba-entrando { animation: none; }
 .select-chevron { width: 17px; height: 17px; flex: 0 0 17px; color: #7c8d82; transition: transform .18s ease; }
 .select-trigger[aria-expanded="true"] .select-chevron { transform: rotate(180deg); color: var(--emerald-600); }
 
-/* position:fixed (não absolute) + coordenadas calculadas em JS
-   (posicionarListbox em script.js): assim o menu "flutua" sobre a página
-   inteira e nunca fica escondido atrás de outro cartão/seção, não importa
-   onde o campo esteja na tela. */
+/* Vive no final do <body> (não dentro do formulário) com position:absolute
+   e coordenadas de página calculadas em JS (posicionarListbox em
+   script.js): assim o menu nunca fica escondido atrás de outro cartão ou
+   seção, não importa onde o campo esteja na tela. */
 .select-listbox {
-  position: fixed;
+  position: absolute;
   z-index: 550;
   top: 0;
   left: 0;

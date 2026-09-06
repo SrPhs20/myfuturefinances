@@ -465,7 +465,12 @@ function mfRealcarSelect(selectId, { comCor = false } = {}) {
   listbox.id = listboxId;
   listbox.setAttribute("role", "listbox");
   listbox.tabIndex = -1;
-  wrapper.appendChild(listbox);
+  /* Vai direto para o final do <body> (não fica dentro do wrapper) — assim
+     a posição dele é calculada em coordenadas absolutas da página inteira,
+     sem depender de nenhum ancestral do formulário (grid, cartão com
+     blur/animação etc.) que poderia escondê-lo ou empurrá-lo pra um lugar
+     errado da tela. */
+  document.body.appendChild(listbox);
 
   let indiceAtivo = -1;
 
@@ -485,30 +490,31 @@ function mfRealcarSelect(selectId, { comCor = false } = {}) {
   }
 
   function aoClicarFora(event) {
-    if (!wrapper.contains(event.target)) fechar();
+    if (!wrapper.contains(event.target) && !listbox.contains(event.target)) fechar();
   }
 
-  /* O menu abre "flutuando" com position:fixed calculado via JS (em vez de
-     absolute preso ao formulário) — assim ele nunca fica escondido atrás de
-     outro cartão/seção da página, não importa onde o campo esteja na tela. */
+  /* O menu mora no final do <body> e usa position:absolute com coordenadas
+     de PÁGINA (rect + rolagem atual) — não "fixed" relativo à janela. Isso
+     evita de vez qualquer confusão com ancestrais do formulário e continua
+     acompanhando o campo certinho ao rolar a página (é só recalcular). */
   function posicionarListbox() {
     const rect = trigger.getBoundingClientRect();
     const alturaMaxima = 264;
     const espacoAbaixo = window.innerHeight - rect.bottom;
     const espacoAcima = rect.top;
-    const abrirParaCima = espacoAbaixo < alturaMaxima + 12 && espacoAcima > espacoAbaixo;
+    const abrirParaCima = espacoAbaixo < 120 && espacoAcima > espacoAbaixo;
 
-    listbox.style.left = `${rect.left}px`;
+    listbox.style.left = `${rect.left + window.scrollX}px`;
     listbox.style.width = `${rect.width}px`;
 
     if (abrirParaCima) {
-      listbox.style.top = "auto";
-      listbox.style.bottom = `${window.innerHeight - rect.top + 6}px`;
-      listbox.style.maxHeight = `${Math.max(Math.min(espacoAcima - 12, alturaMaxima), 120)}px`;
+      const altura = Math.max(Math.min(espacoAcima - 12, alturaMaxima), 120);
+      listbox.style.maxHeight = `${altura}px`;
+      listbox.style.top = `${rect.top + window.scrollY - 6 - altura}px`;
     } else {
-      listbox.style.bottom = "auto";
-      listbox.style.top = `${rect.bottom + 6}px`;
-      listbox.style.maxHeight = `${Math.max(Math.min(espacoAbaixo - 12, alturaMaxima), 120)}px`;
+      const altura = Math.max(Math.min(espacoAbaixo - 12, alturaMaxima), 120);
+      listbox.style.maxHeight = `${altura}px`;
+      listbox.style.top = `${rect.bottom + window.scrollY + 6}px`;
     }
   }
 
@@ -1702,17 +1708,43 @@ function atualizarGruposContas() {
     const contasDoGrupo = contasFixas.filter(conta => Number(conta.grupo_id) === Number(grupo.id));
     const total = contasDoGrupo.reduce((soma, conta) => soma + Number(conta.valor), 0);
     const cor = corParaGrupo(grupo.nome);
+
+    const nomesContas = contasDoGrupo.map(conta => conta.nome);
+    const resumoContas = !nomesContas.length
+      ? "Nenhuma conta neste grupo ainda"
+      : nomesContas.length > 3
+        ? `${nomesContas.slice(0, 3).map(escaparHTML).join(", ")} e mais ${nomesContas.length - 3}`
+        : nomesContas.map(escaparHTML).join(", ");
+
     return `
-      <article class="group-card">
+      <article class="group-card group-card-clicavel" onclick="verContasDoGrupo(${grupo.id})" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){verContasDoGrupo(${grupo.id})}" aria-label="Ver contas do grupo ${escaparHTML(grupo.nome)}">
         <div class="group-card-icon" style="background:linear-gradient(145deg, ${cor.dot}, ${cor.fg})">${escaparHTML(grupo.nome.slice(0, 1).toUpperCase())}</div>
         <div class="group-card-copy">
           <span>${contasDoGrupo.length} conta${contasDoGrupo.length === 1 ? "" : "s"}</span>
           <h3>${escaparHTML(grupo.nome)}</h3>
           <strong>${formatarMoeda(total)} <small>/ mês</small></strong>
+          <small class="group-card-resumo-contas">${resumoContas}</small>
         </div>
-        <button type="button" class="group-delete-button" onclick="removerGrupoConta(${grupo.id})" aria-label="Excluir grupo ${escaparHTML(grupo.nome)}">Excluir</button>
+        <button type="button" class="group-delete-button" onclick="event.stopPropagation(); removerGrupoConta(${grupo.id})" aria-label="Excluir grupo ${escaparHTML(grupo.nome)}">Excluir</button>
       </article>`;
   }).join("");
+}
+
+/* Clicar num grupo (na aba "Meus grupos") leva para "Contas fixas" já
+   filtrado por aquele grupo, reaproveitando o filtro que já existe ali —
+   assim dá pra ver rapidinho quais contas estão dentro do grupo. */
+function verContasDoGrupo(id) {
+  const seletor = document.getElementById("filtroGrupoConta");
+  if (seletor) {
+    seletor.value = String(id);
+    mfAtualizarSelectRealcado("filtroGrupoConta");
+  }
+
+  mostrarPainelContasFixas("contas");
+  atualizarContasFixas();
+
+  const lista = document.getElementById("listaContasFixas");
+  if (lista) lista.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function resumoDoMes(mes) {
