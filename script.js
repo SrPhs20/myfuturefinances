@@ -2956,16 +2956,28 @@ function atualizarCartoesRegistrados() {
   const lista = document.getElementById("listaCartoesRegistrados");
   if (!lista) return;
   const resumo = document.getElementById("resumoCartoesRegistrados");
-  if (resumo) resumo.textContent = `${cartoes.length} cartão${cartoes.length === 1 ? "" : "ões"}`;
+  if (resumo) resumo.textContent = `${cartoes.length} ${cartoes.length === 1 ? "cartão" : "cartões"}`;
 
   if (!cartoes.length) {
     lista.innerHTML = '<p class="empty-state">Nenhum cartão cadastrado. Clique em "+ Novo cartão" para cadastrar o cartão que você usa no dia a dia.</p>';
+    atualizarDetalheCartaoSelecionado();
     return;
   }
+
+  const hoje = hojeTexto();
 
   lista.innerHTML = cartoes.map(cartao => {
     const contasVinculadas = contasFixas.filter(conta => Number(conta.cartao_id) === Number(cartao.id));
     const totalMensal = contasVinculadas.reduce((total, conta) => total + Number(conta.valor), 0);
+
+    /* Uma conta fixa vinculada ao cartão só ocupa limite quando ela chega
+       na data de vencimento (entra na fatura atual) — enquanto ainda não
+       venceu, ela não desconta nada do limite disponível. Ao marcar como
+       paga, o vencimento rola pro mês seguinte e ela sai da fatura atual
+       automaticamente, devolvendo o limite. */
+    const contasNaFaturaAtual = contasVinculadas.filter(conta => conta.vencimento <= hoje);
+    const totalContasNaFaturaAtual = contasNaFaturaAtual.reduce((total, conta) => total + Number(conta.valor), 0);
+
     const parcelasVinculadas = cartoesParcelados.filter(item => Number(item.cartao_id) === Number(cartao.id) && Number(item.parcelas_pagas) < Number(item.total_parcelas));
     const totalParcelasAberto = parcelasVinculadas.reduce((total, item) => {
       const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
@@ -2973,15 +2985,19 @@ function atualizarCartoesRegistrados() {
       return total + valorParcela * restantes;
     }, 0);
 
-    const usoTotal = totalParcelasAberto + totalMensal;
+    const usoTotal = totalParcelasAberto + totalContasNaFaturaAtual;
     const banco = estiloCartaoBanco(cartao.nome);
     const temLimite = cartao.limite !== null && cartao.limite !== undefined && cartao.limite !== "";
     const limite = temLimite ? Number(cartao.limite) : null;
     const disponivel = limite !== null ? Math.max(limite - usoTotal, 0) : null;
     const percentualUso = limite ? Math.min((usoTotal / limite) * 100, 100) : 0;
 
+    const detalheContas = contasVinculadas.length
+      ? `${contasVinculadas.length} conta${contasVinculadas.length === 1 ? "" : "s"} fixa${contasVinculadas.length === 1 ? "" : "s"} (${formatarMoeda(totalMensal)}/mês${contasNaFaturaAtual.length ? `, ${formatarMoeda(totalContasNaFaturaAtual)} na fatura atual` : ", nenhuma na fatura atual"})`
+      : "Nenhuma conta fixa vinculada";
+
     return `
-      <article class="cartao-visual-wrap">
+      <article class="cartao-visual-wrap cartao-visual-wrap-clicavel" data-cartao-id="${cartao.id}" onclick="verComprasDoCartao(${cartao.id})" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){verComprasDoCartao(${cartao.id})}" aria-label="Ver compras do cartão ${escaparHTML(cartao.nome)}">
         <div class="cartao-visual" style="background:linear-gradient(135deg, ${banco.grad[0]}, ${banco.grad[1]}); color:${banco.texto};">
           <div class="cartao-visual-top">
             <span class="cartao-visual-banco">${escaparHTML(banco.rotulo || cartao.nome)}</span>
@@ -3001,15 +3017,125 @@ function atualizarCartoesRegistrados() {
                 : `<span>Em uso neste cartão</span><strong>${formatarMoeda(usoTotal)}</strong><small>Edite o cartão para definir um limite</small>`}
             </div>
             <div class="card-registrado-actions">
-              <button type="button" class="card-registrado-edit-button" onclick="editarCartaoRegistrado(${cartao.id})">Editar</button>
-              <button type="button" class="group-delete-button" onclick="removerCartaoRegistrado(${cartao.id})" aria-label="Excluir cartão ${escaparHTML(cartao.nome)}">Excluir</button>
+              <button type="button" class="card-registrado-edit-button" onclick="event.stopPropagation(); editarCartaoRegistrado(${cartao.id})">Editar</button>
+              <button type="button" class="group-delete-button" onclick="event.stopPropagation(); removerCartaoRegistrado(${cartao.id})" aria-label="Excluir cartão ${escaparHTML(cartao.nome)}">Excluir</button>
             </div>
           </div>
           ${temLimite ? `<div class="meta-bar"><div class="meta-fill" style="width:${percentualUso}%"></div></div>` : ""}
-          <small class="cartao-visual-detalhe">${contasVinculadas.length} conta${contasVinculadas.length === 1 ? "" : "s"} fixa${contasVinculadas.length === 1 ? "" : "s"} (${formatarMoeda(totalMensal)}/mês) • ${parcelasVinculadas.length} parcelamento${parcelasVinculadas.length === 1 ? "" : "s"} em aberto</small>
+          <small class="cartao-visual-detalhe">${detalheContas} • ${parcelasVinculadas.length} parcelamento${parcelasVinculadas.length === 1 ? "" : "s"} em aberto</small>
+          <small class="cartao-visual-ver-mais">Clique para ver as compras deste cartão</small>
         </div>
       </article>`;
   }).join("");
+
+  atualizarDetalheCartaoSelecionado();
+}
+
+/* Painel que abre ao clicar num cartão cadastrado: mostra tudo que está
+   vinculado a ele (contas fixas e compras parceladas) com as mesmas ações
+   de sempre (marcar como paga, editar, excluir) — sem duplicar lógica, só
+   reaproveitando as funções que já existem para contas fixas e parcelas. */
+let cartaoDetalheId = null;
+
+function verComprasDoCartao(id) {
+  cartaoDetalheId = Number(cartaoDetalheId) === Number(id) ? null : Number(id);
+  atualizarDetalheCartaoSelecionado();
+
+  if (cartaoDetalheId) {
+    document.getElementById("detalheCartaoSelecionado")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function fecharDetalheCartao() {
+  cartaoDetalheId = null;
+  atualizarDetalheCartaoSelecionado();
+}
+
+function atualizarDetalheCartaoSelecionado() {
+  const painel = document.getElementById("detalheCartaoSelecionado");
+  if (!painel) return;
+
+  const cartao = cartaoDetalheId ? cartoes.find(item => Number(item.id) === Number(cartaoDetalheId)) : null;
+
+  document.querySelectorAll("#listaCartoesRegistrados .cartao-visual-wrap-clicavel").forEach(elemento => {
+    elemento.classList.toggle("cartao-visual-wrap-selecionado", !!cartao && Number(elemento.dataset.cartaoId) === Number(cartao.id));
+  });
+
+  if (!cartao) {
+    painel.classList.add("hidden");
+    painel.innerHTML = "";
+    return;
+  }
+
+  const hoje = hojeTexto();
+  const contasDoCartao = contasFixas.filter(conta => Number(conta.cartao_id) === Number(cartao.id));
+  const parcelasDoCartao = cartoesParcelados.filter(item => Number(item.cartao_id) === Number(cartao.id));
+
+  const linhasContas = contasDoCartao.map(conta => {
+    let status = "Em aberto";
+    let classeStatus = "status-open";
+    if (conta.vencimento < hoje) {
+      status = "Vencida";
+      classeStatus = "status-late";
+    } else if (conta.vencimento === hoje) {
+      status = "Vence hoje";
+      classeStatus = "status-today";
+    }
+
+    return `
+      <div class="fixed-bill">
+        <div>
+          <strong>${escaparHTML(conta.nome)}</strong>
+          <p>${formatarMoeda(conta.valor)} • Vencimento: ${formatarData(conta.vencimento)}</p>
+          <div class="bill-tags">
+            <span class="status ${classeStatus}">${status}</span>
+            <span class="group-badge card-badge">Conta fixa</span>
+          </div>
+        </div>
+        <div class="bill-actions">
+          <button type="button" onclick="pagarContaFixa(${conta.id})">Marcar como paga</button>
+          <button type="button" onclick="editarContaFixa(${conta.id})">Editar</button>
+          <button type="button" class="danger" onclick="removerContaFixa(${conta.id})">Excluir</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  const linhasParcelas = parcelasDoCartao.map(item => {
+    const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
+    const restantes = Number(item.total_parcelas) - Number(item.parcelas_pagas);
+    const quitado = restantes <= 0 || item.status === "quitado";
+
+    return `
+      <div class="fixed-bill">
+        <div>
+          <strong>${escaparHTML(item.descricao)}</strong>
+          <p>${item.total_parcelas}x de ${formatarMoeda(valorParcela)} • Pagas: ${item.parcelas_pagas} • Restantes: ${Math.max(restantes, 0)}</p>
+          <div class="bill-tags">
+            <span class="status ${quitado ? "status-open" : "status-open"}">${quitado ? "Quitado" : "Em andamento"}</span>
+            <span class="group-badge card-badge">Compra parcelada</span>
+          </div>
+        </div>
+        <div class="bill-actions">
+          ${!quitado ? `<button type="button" onclick="pagarParcelaCartao(${item.id})">Pagar próxima parcela</button>` : ""}
+          <button type="button" onclick="editarParcelamento(${item.id})">Editar</button>
+          <button type="button" class="danger" onclick="excluirParcelamento(${item.id})">Excluir</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  const semNada = !contasDoCartao.length && !parcelasDoCartao.length;
+
+  painel.classList.remove("hidden");
+  painel.innerHTML = `
+    <div class="fixed-list-heading">
+      <div>
+        <span class="eyebrow">Nesse cartão</span>
+        <h2>Compras em ${escaparHTML(cartao.nome)}</h2>
+      </div>
+      <button type="button" class="secondary small-button" onclick="fecharDetalheCartao()">Fechar</button>
+    </div>
+    ${semNada ? '<p class="empty-state">Nenhuma conta fixa ou compra parcelada vinculada a este cartão ainda.</p>' : `${linhasContas}${linhasParcelas}`}
+  `;
 }
 
 function parcelasCartaoDoMes(mesReferencia = hojeTexto().slice(0, 7)) {

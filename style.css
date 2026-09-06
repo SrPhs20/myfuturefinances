@@ -1261,6 +1261,14 @@ tbody tr:hover { background: #f4f8f3; }
 .cartao-visual-info-top .card-registrado-actions { position: static; flex-shrink: 0; display: flex; gap: 2px; }
 .cartao-visual-info-top .card-registrado-actions .group-delete-button { position: static; }
 .cartao-visual-detalhe { color: #819087; font-size: .68rem; }
+.cartao-visual-ver-mais { display: block; margin-top: 2px; color: var(--emerald-700); font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Cartão cadastrado é clicável: clicar abre, embaixo da galeria, tudo que
+   está vinculado àquele cartão (contas fixas e compras parceladas). */
+.cartao-visual-wrap-clicavel { cursor: pointer; transition: border-color .15s ease, transform .1s ease, box-shadow .15s ease; }
+.cartao-visual-wrap-clicavel:hover { border-color: #9ebba6; transform: translateY(-2px); }
+.cartao-visual-wrap-clicavel:focus-visible { outline: 3px solid rgba(49, 164, 111, .28); outline-offset: 2px; }
+.cartao-visual-wrap-selecionado { border-color: var(--emerald-500); box-shadow: 0 0 0 3px rgba(49, 164, 111, .16); }
 
 @media (max-width: 820px) {
   .fixed-account-form { grid-template-columns: 1fr 1fr; }
