@@ -16,7 +16,16 @@ let perfilAtual = null;
 let cartoesParcelados = [];
 let orcamentos = [];
 let objetivosFinanceiros = [];
+let categorias = [];
 let mesDashboard = null;
+
+/* Categorias básicas que o app já sugere para todo mundo, mesmo sem o
+   usuário ter cadastrado nenhuma ainda. As que ele adicionar em "+ Nova
+   categoria" ficam salvas na tabela categorias e se somam a essa lista. */
+const CATEGORIAS_PADRAO = [
+  "Alimentação", "Moradia", "Transporte", "Saúde", "Educação", "Lazer",
+  "Assinaturas", "Salário", "Investimentos", "Conta fixa", "Cartão de crédito", "Outros"
+];
 
 let editandoId = null;
 let calendarioData;
@@ -626,6 +635,8 @@ mfRealcarSelect("grupoConta", { comCor: true });
 mfRealcarSelect("filtroGrupoConta", { comCor: true });
 mfRealcarSelect("cartaoContaFixa", { comCor: true });
 mfRealcarSelect("cartaoParcelaId", { comCor: true });
+mfRealcarSelect("categoria");
+mfRealcarSelect("orcamentoCategoria");
 
 function formatarMoeda(valor) {
   return Number(valor).toLocaleString("pt-BR", {
@@ -1104,7 +1115,7 @@ async function iniciarApp({ bloquear = true } = {}) {
   }
 }
 async function carregarDados() {
-  const [resLancamentos, resContas, resGruposContas, resCartoesRegistrados, resMetas, resCartoes, resOrcamentos, resObjetivos] = await Promise.all([
+  const [resLancamentos, resContas, resGruposContas, resCartoesRegistrados, resMetas, resCartoes, resOrcamentos, resObjetivos, resCategorias] = await Promise.all([
     supabaseClient
       .from("lancamentos")
       .select("*")
@@ -1141,10 +1152,15 @@ async function carregarDados() {
       .from("objetivos_financeiros")
       .select("*")
       .eq("user_id", usuarioAtual.id)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabaseClient
+      .from("categorias")
+      .select("*")
+      .eq("user_id", usuarioAtual.id)
+      .order("nome", { ascending: true })
   ]);
 
-  const erro = resLancamentos.error || resContas.error || resGruposContas.error || resCartoesRegistrados.error || resMetas.error || resCartoes.error || resOrcamentos.error || resObjetivos.error;
+  const erro = resLancamentos.error || resContas.error || resGruposContas.error || resCartoesRegistrados.error || resMetas.error || resCartoes.error || resOrcamentos.error || resObjetivos.error || resCategorias.error;
   if (erro) {
     throw new Error(mensagemErro(erro, "Não foi possível carregar seus dados."));
   }
@@ -1158,6 +1174,7 @@ async function carregarDados() {
   cartoesParcelados = resCartoes.data || [];
   orcamentos = resOrcamentos.data || [];
   objetivosFinanceiros = resObjetivos.data || [];
+  categorias = resCategorias.data || [];
   if (!mesDashboard) mesDashboard = hojeTexto().slice(0, 7);
 }
 
@@ -1646,6 +1663,82 @@ function atualizarOpcoesCartoes() {
   mfAtualizarSelectRealcado("cartaoContaFixa");
   mfAtualizarSelectRealcado("cartaoParcelaId");
 }
+
+/* Lista de categorias que aparece no seletor: as básicas do app + as que o
+   usuário cadastrou em "+ Nova categoria" + qualquer categoria antiga que já
+   estava em uso em lançamentos/orçamentos (assim nada que já existia some da
+   lista quando abre para editar). */
+function listaCategorias() {
+  const nomes = new Set(CATEGORIAS_PADRAO);
+  categorias.forEach(item => { if (item.nome) nomes.add(item.nome); });
+  lancamentos.forEach(item => { if (item.categoria) nomes.add(item.categoria); });
+  orcamentos.forEach(item => { if (item.categoria) nomes.add(item.categoria); });
+  return Array.from(nomes).sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+function atualizarOpcoesCategorias() {
+  const seletorCategoria = document.getElementById("categoria");
+  const seletorOrcamento = document.getElementById("orcamentoCategoria");
+  if (!seletorCategoria && !seletorOrcamento) return;
+
+  const nomes = listaCategorias();
+  const opcoes = `<option value="">Selecione</option>${nomes.map(nome => `<option value="${escaparHTML(nome)}">${escaparHTML(nome)}</option>`).join("")}`;
+
+  if (seletorCategoria) {
+    const atual = seletorCategoria.value;
+    seletorCategoria.innerHTML = opcoes;
+    seletorCategoria.value = nomes.includes(atual) ? atual : "";
+    mfAtualizarSelectRealcado("categoria");
+  }
+  if (seletorOrcamento) {
+    const atual = seletorOrcamento.value;
+    seletorOrcamento.innerHTML = opcoes;
+    seletorOrcamento.value = nomes.includes(atual) ? atual : "";
+    mfAtualizarSelectRealcado("orcamentoCategoria");
+  }
+}
+
+document.getElementById("botaoNovaCategoria")?.addEventListener("click", () => {
+  const bloco = document.getElementById("blocoNovaCategoria");
+  if (!bloco) return;
+  bloco.classList.toggle("hidden");
+  if (!bloco.classList.contains("hidden")) document.getElementById("novaCategoriaNome").focus();
+});
+
+async function salvarNovaCategoria() {
+  const campo = document.getElementById("novaCategoriaNome");
+  const nome = campo.value.trim();
+  if (!nome) return;
+
+  const { error } = await supabaseClient.from("categorias").insert([{
+    user_id: usuarioAtual.id,
+    nome
+  }]);
+
+  if (error) {
+    mfToast(error.code === "23505" ? "Você já tem uma categoria com esse nome." : mensagemErro(error, "Não foi possível adicionar a categoria."));
+    return;
+  }
+
+  campo.value = "";
+  document.getElementById("blocoNovaCategoria").classList.add("hidden");
+  await carregarDados();
+  atualizarOpcoesCategorias();
+  const seletorCategoria = document.getElementById("categoria");
+  if (seletorCategoria) {
+    seletorCategoria.value = nome;
+    mfAtualizarSelectRealcado("categoria");
+  }
+  mfToast("Categoria adicionada!");
+}
+
+document.getElementById("botaoSalvarCategoria")?.addEventListener("click", salvarNovaCategoria);
+document.getElementById("novaCategoriaNome")?.addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    salvarNovaCategoria();
+  }
+});
 
 function mostrarPainelContasFixas(painel) {
   const exibindoGrupos = painel === "grupos";
@@ -2771,7 +2864,7 @@ function limparFormularioCartao() {
 
   editandoCartaoId = null;
 
-  document.getElementById("botaoCartao").textContent = "Adicionar compra parcelada";
+  document.getElementById("botaoCartao").textContent = "Salvar no cartão";
   document.getElementById("cancelarEdicaoCartao").classList.add("hidden");
 }
 
@@ -2794,7 +2887,7 @@ function cancelarEdicaoCartao() {
   }
 
   document.getElementById("botaoCartao").textContent =
-    "Adicionar compra parcelada";
+    "Salvar no cartão";
 
   document
     .getElementById("cancelarEdicaoCartao")
@@ -2843,7 +2936,7 @@ function alternarBlocoCartao(tipo, estadoForcado) {
   if (botao) {
     botao.textContent = abrir
       ? "✕ Fechar"
-      : (tipo === "cartao" ? "+ Novo cartão" : "+ Nova compra parcelada");
+      : (tipo === "cartao" ? "+ Novo cartão" : "+ Compra ou dívida no cartão");
   }
   if (abrir) {
     bloco.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -3345,6 +3438,7 @@ function atualizarPlanejamento() {
 }
 
 function atualizarTudo() {
+  atualizarOpcoesCategorias();
   atualizarTela();
   atualizarContasFixas();
   atualizarGruposContas();

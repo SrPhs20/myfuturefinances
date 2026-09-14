@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=23" />
+  <link rel="stylesheet" href="style.css?v=24" />
 </head>
 <body>
   <div class="container">
@@ -192,14 +192,18 @@
           <option value="despesa">Despesa</option>
         </select>
 
-        <label>Categoria</label>
-        <input id="categoria" type="text" list="categoriasComuns" placeholder="Ex. Alimentação, Salário, Transporte" required />
-        <datalist id="categoriasComuns">
-          <option value="Alimentação"><option value="Moradia"><option value="Transporte">
-          <option value="Saúde"><option value="Educação"><option value="Lazer">
-          <option value="Assinaturas"><option value="Salário"><option value="Investimentos">
-          <option value="Conta fixa"><option value="Cartão de crédito"><option value="Outros">
-        </datalist>
+        <div class="categoria-field-row">
+          <label for="categoria">Categoria</label>
+          <button type="button" class="link-button small-button" id="botaoNovaCategoria">+ Nova categoria</button>
+        </div>
+        <select id="categoria" required>
+          <option value="">Selecione</option>
+        </select>
+
+        <div id="blocoNovaCategoria" class="categoria-add-row hidden">
+          <input id="novaCategoriaNome" type="text" maxlength="40" placeholder="Ex. Pets, Academia" />
+          <button type="button" class="secondary small-button" id="botaoSalvarCategoria">Adicionar</button>
+        </div>
 
         <label>Descrição</label>
         <input id="descricao" type="text" placeholder="Ex. Mercado do mês" required />
@@ -381,7 +385,7 @@
 
   <div class="card-actions-row">
     <button type="button" class="secondary" id="botaoAlternarNovoCartao">+ Novo cartão</button>
-    <button type="button" class="secondary" id="botaoAlternarNovaCompra">+ Nova compra parcelada</button>
+    <button type="button" class="secondary" id="botaoAlternarNovaCompra">+ Compra ou dívida no cartão</button>
   </div>
 
   <div id="blocoNovoCartao" class="chart hidden">
@@ -416,31 +420,39 @@
 
   <div id="blocoNovaCompra" class="chart hidden">
     <form id="formCartao">
+      <div class="form-intro">
+        <span class="eyebrow">Compra nova ou dívida que já existia</span>
+        <h2 id="tituloFormCartao">Registrar no cartão</h2>
+        <p>Serve tanto para uma compra que você acabou de fazer quanto para uma dívida antiga que ainda está sendo cobrada na fatura: escolha a data da primeira parcela no passado e informe quantas já foram pagas. O valor que ainda falta pagar entra automaticamente no limite do cartão e vai sumindo conforme você for pagando as parcelas.</p>
+      </div>
+
       <label for="cartaoParcelaId">Cartão</label>
       <select id="cartaoParcelaId" required>
         <option value="">Selecione um cartão</option>
       </select>
       <p class="empty-state hidden" id="avisoSemCartaoParcela">Você ainda não cadastrou nenhum cartão. Clique em "+ Novo cartão" e cadastre um antes de adicionar uma compra parcelada.</p>
 
-      <label>Descrição da compra</label>
-      <input id="cartaoDescricao" type="text" placeholder="Ex. Notebook, Celular, Curso" required />
+      <label>Descrição</label>
+      <input id="cartaoDescricao" type="text" placeholder="Ex. Notebook, Celular, dívida antiga do cartão" required />
 
-      <label>Valor total da compra</label>
+      <label>Valor total (o que falta pagar dessa compra ou dívida)</label>
       <input id="cartaoValorTotal" type="number" step="0.01" placeholder="Ex. 3000,00" required />
 
-      <label>Total de parcelas</label>
+      <label>Total de parcelas (em quantos meses)</label>
       <input id="cartaoTotalParcelas" type="number" min="1" placeholder="Ex. 10" required />
 
       <label>Parcelas já pagas</label>
       <input id="cartaoParcelasPagas" type="number" min="0" placeholder="Ex. 3" value="0" required />
+      <small class="field-hint">Se for uma dívida antiga que você já vem pagando, conte quantas parcelas já foram pagas até hoje.</small>
 
       <label>Data da primeira parcela</label>
       <input id="cartaoDataPrimeiraParcela" type="date" required />
+      <small class="field-hint">Pode ser uma data no passado, se a dívida já começou antes de hoje.</small>
 
       <label>Dia de vencimento da fatura</label>
       <input id="cartaoDiaVencimento" type="number" min="1" max="31" placeholder="Ex. 10" required />
 
-      <button id="botaoCartao" type="submit">Adicionar compra parcelada</button>
+      <button id="botaoCartao" type="submit">Salvar no cartão</button>
       <button type="button" class="secondary hidden" id="cancelarEdicaoCartao">Cancelar edição</button>
     </form>
   </div>
@@ -476,7 +488,9 @@
             <span class="eyebrow">Orçamento por categoria</span>
             <h2 id="tituloFormOrcamento">Criar limite mensal</h2>
             <label>Categoria</label>
-            <input id="orcamentoCategoria" list="categoriasComuns" placeholder="Ex. Alimentação" required />
+            <select id="orcamentoCategoria" required>
+              <option value="">Selecione</option>
+            </select>
             <label>Limite para o mês analisado</label>
             <input id="orcamentoLimite" type="number" min="0.01" step="0.01" placeholder="Ex. 800,00" required />
             <button id="botaoOrcamento" type="submit">Salvar orçamento</button>
@@ -532,6 +546,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=20"></script>
+  <script src="script.js?v=21"></script>
 </body>
 </html>

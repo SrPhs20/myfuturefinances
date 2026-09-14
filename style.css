@@ -1167,6 +1167,15 @@ tbody tr:hover { background: #f4f8f3; }
 .group-create-fields { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 9px; }
 .group-create-fields button { width: auto; min-height: 44px; }
 
+.categoria-field-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.categoria-field-row label { margin-top: 0; }
+.categoria-field-row .link-button { width: auto; margin: 0; }
+.categoria-add-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 9px; margin: -2px 0 4px; }
+.categoria-add-row button { width: auto; min-height: 44px; }
+.field-hint { display: block; margin: -5px 0 2px; color: var(--muted); font-size: .78rem; line-height: 1.4; font-weight: 400; }
+.form-intro h2 { margin: 4px 0 6px; }
+.form-intro p { max-width: 620px; margin: 0; color: var(--muted); line-height: 1.5; font-weight: 400; }
+
 .groups-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: 12px; }
 .groups-grid > .empty-state { grid-column: 1 / -1; }
 .group-card {
