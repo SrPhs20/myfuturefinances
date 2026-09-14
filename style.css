@@ -590,23 +590,56 @@ span.flatpickr-weekday {
 }
 
 .profile-card {
+  position: relative;
   width: 100%;
   max-width: 420px;
+  max-height: min(58vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: white;
-  padding: 24px;
+  padding: 26px 24px 22px;
   border-radius: 22px;
   display: grid;
   gap: 12px;
+  align-content: start;
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.25);
 }
 
+.profile-modal-close {
+  position: sticky;
+  top: 0;
+  float: right;
+  margin: -14px -12px 4px 0;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--forest-800);
+  background: var(--mint-50);
+  box-shadow: none;
+  z-index: 2;
+}
+
+.profile-modal-close:hover {
+  color: var(--forest-950);
+  background: var(--mint-100);
+  box-shadow: none;
+  transform: none;
+}
+
 .profile-avatar-large {
-  width: 110px;
-  height: 110px;
+  width: 92px;
+  height: 92px;
   border-radius: 999px;
   object-fit: cover;
   justify-self: center;
-  border: 3px solid #2563eb;
+  border: 3px solid var(--emerald-500);
 }
 
 .profile-modal.hidden {
@@ -1170,9 +1203,44 @@ tbody tr:hover { background: #f4f8f3; }
 .categoria-field-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
 .categoria-field-row label { margin-top: 0; }
 .categoria-field-row .link-button { width: auto; margin: 0; }
+.categoria-field-actions { display: flex; align-items: center; gap: 12px; }
 .categoria-add-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 9px; margin: -2px 0 4px; }
 .categoria-add-row button { width: auto; min-height: 44px; }
 .field-hint { display: block; margin: -5px 0 2px; color: var(--muted); font-size: .78rem; line-height: 1.4; font-weight: 400; }
+
+.categoria-manage-box { margin: -2px 0 4px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--mint-50); }
+.categoria-manage-box .field-hint { margin: 0 0 8px; }
+.categoria-chip-list { display: flex; flex-wrap: wrap; gap: 7px; }
+.categoria-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--forest-900);
+}
+.categoria-chip-locked { color: var(--muted); background: var(--mint-100); }
+.categoria-chip-locked::before { content: "🔒"; font-size: .7rem; }
+.categoria-chip-delete {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  font-size: .85rem;
+  color: #fff;
+  background: #dc4a4a;
+  box-shadow: none;
+}
+.categoria-chip-delete:hover { background: #c53c3c; box-shadow: none; transform: none; }
 .form-intro h2 { margin: 4px 0 6px; }
 .form-intro p { max-width: 620px; margin: 0; color: var(--muted); line-height: 1.5; font-weight: 400; }
 
@@ -1507,6 +1575,100 @@ tbody tr:hover { background: #f4f8f3; }
 .setup-pill { width: fit-content; padding: 5px 9px; border-radius: 999px; color: #d9efdf; background: rgba(157, 215, 174, .14); font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .gate-switch { margin-top: 25px; padding: 7px 10px; min-height: 34px; border: 0; color: #91ad9b; background: transparent; box-shadow: none; font-size: .78rem; }
 .gate-switch:hover { color: #fff; background: rgba(255, 255, 255, .06); box-shadow: none; transform: none; }
+
+.profile-photo-picker { display: grid; justify-items: center; gap: 10px; margin: 2px 0 4px; }
+
+.profile-photo-button {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.profile-photo-button:hover, .profile-photo-button:focus-visible {
+  box-shadow: none;
+  transform: none;
+}
+
+.profile-avatar-vazio {
+  display: grid;
+  place-items: center;
+  font-size: 1.7rem;
+  background: var(--mint-50);
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.profile-avatar-vazio.hidden { display: none; }
+
+.profile-photo-edit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--emerald-600), var(--forest-800));
+  color: #fff;
+  font-size: .82rem;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, .22);
+}
+
+.profile-name-input {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--forest-950);
+  border: none;
+  border-bottom: 2px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 4px;
+  max-width: 260px;
+}
+
+.profile-name-input:focus { border-bottom-color: var(--emerald-500); box-shadow: none; }
+
+.profile-security-box {
+  margin: 7px 0;
+  padding: 16px;
+  border-radius: 16px;
+  color: #eafff2;
+  background: linear-gradient(160deg, #06150d 0%, #0b2b1e 100%);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, .28);
+}
+
+.profile-security-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.profile-security-box .eyebrow { color: #7ee2a8; }
+.profile-security-box h3 { margin: 0; color: #f2fff6; }
+.profile-security-box p { margin: 6px 0 10px; color: #b7d9c4; font-size: .78rem; }
+.profile-security-box label { color: #d7f2e1; }
+.profile-security-box input {
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(34, 197, 94, .35);
+  color: #f2fff6;
+}
+.profile-security-box input::placeholder { color: #7f9d8c; }
+
+.profile-security-lock {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, .16);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, .35);
+}
 
 .profile-pin-settings { margin: 7px 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--mint-50); }
 .profile-pin-settings h3 { margin: 0 0 4px; color: var(--forest-900); }

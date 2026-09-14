@@ -152,24 +152,19 @@ appContainer.insertAdjacentHTML("afterbegin", `
 
   <div id="modalPerfil" class="profile-modal hidden">
     <div class="profile-card">
+      <button type="button" class="profile-modal-close" onclick="fecharPerfil()" aria-label="Fechar">&times;</button>
+
       <h2>Meu perfil</h2>
 
-      <label>Nome</label>
-      <input id="perfilNome" type="text" placeholder="Seu nome" />
-
-      <label>Nova foto</label>
-      <input id="perfilFoto" type="file" accept="image/*" />
-
-      <img id="previewPerfil" class="profile-avatar-large hidden" />
-
-      <div class="profile-pin-settings">
-        <span class="eyebrow">Segurança do aplicativo</span>
-        <h3>Alterar PIN de acesso</h3>
-        <p>Deixe em branco para manter o PIN atual.</p>
-        <label for="perfilNovoPin">Novo PIN</label>
-        <input id="perfilNovoPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="4 a 8 números" oninput="limitarCampoPin(this)" />
-        <label for="perfilConfirmarPin">Confirme o novo PIN</label>
-        <input id="perfilConfirmarPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="Repita os números" oninput="limitarCampoPin(this)" />
+      <div class="profile-photo-picker">
+        <button type="button" class="profile-photo-button" onclick="document.getElementById('perfilFoto').click()" aria-label="Trocar foto de perfil">
+          <img id="previewPerfil" class="profile-avatar-large hidden" />
+          <span id="previewPerfilVazio" class="profile-avatar-large profile-avatar-vazio" aria-hidden="true">📷</span>
+          <span class="profile-photo-edit" aria-hidden="true">✎</span>
+        </button>
+        <input id="perfilFoto" type="file" accept="image/*" class="hidden" />
+        <label for="perfilNome" class="hidden">Nome</label>
+        <input id="perfilNome" type="text" class="profile-name-input" placeholder="Seu nome" />
       </div>
 
       <div class="profile-pin-settings">
@@ -188,12 +183,44 @@ appContainer.insertAdjacentHTML("afterbegin", `
         </div>
       </div>
 
+      <div class="profile-security-box">
+        <div class="profile-security-head">
+          <span class="profile-security-lock" aria-hidden="true">🔒</span>
+          <div>
+            <span class="eyebrow">Segurança do aplicativo</span>
+            <h3>Alterar PIN de acesso</h3>
+          </div>
+        </div>
+        <p>Deixe os dois campos abaixo em branco para manter o PIN atual.</p>
+        <label for="perfilNovoPin">Novo PIN</label>
+        <input id="perfilNovoPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="4 a 8 números" oninput="limitarCampoPin(this)" />
+        <label for="perfilConfirmarPin">Confirme o novo PIN</label>
+        <input id="perfilConfirmarPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="Repita os números" oninput="limitarCampoPin(this)" />
+      </div>
+
       <button onclick="salvarPerfil()">Salvar perfil</button>
       <button class="danger" onclick="excluirPerfil()">Excluir perfil e dados</button>
-      <button class="secondary" onclick="fecharPerfil()">Fechar</button>
     </div>
   </div>
 `);
+
+document.getElementById("perfilFoto").addEventListener("change", () => {
+  const arquivo = document.getElementById("perfilFoto").files[0];
+  if (!arquivo) return;
+  if (!arquivo.type.startsWith("image/")) {
+    mfToast("Selecione um arquivo de imagem.");
+    return;
+  }
+  const preview = document.getElementById("previewPerfil");
+  const vazio = document.getElementById("previewPerfilVazio");
+  const leitor = new FileReader();
+  leitor.onload = () => {
+    preview.src = leitor.result;
+    preview.classList.remove("hidden");
+    vazio.classList.add("hidden");
+  };
+  leitor.readAsDataURL(arquivo);
+});
 
 const authScreen = document.getElementById("authScreen");
 const form = document.getElementById("form");
@@ -1719,6 +1746,7 @@ function atualizarOpcoesCategorias() {
 document.getElementById("botaoNovaCategoria")?.addEventListener("click", () => {
   const bloco = document.getElementById("blocoNovaCategoria");
   if (!bloco) return;
+  document.getElementById("blocoGerenciarCategorias")?.classList.add("hidden");
   bloco.classList.toggle("hidden");
   if (!bloco.classList.contains("hidden")) document.getElementById("novaCategoriaNome").focus();
 });
@@ -1742,6 +1770,7 @@ async function salvarNovaCategoria() {
   document.getElementById("blocoNovaCategoria").classList.add("hidden");
   await carregarDados();
   atualizarOpcoesCategorias();
+  atualizarListaGerenciarCategorias();
   const seletorCategoria = document.getElementById("categoria");
   if (seletorCategoria) {
     seletorCategoria.value = nome;
@@ -1757,6 +1786,67 @@ document.getElementById("novaCategoriaNome")?.addEventListener("keydown", event 
     salvarNovaCategoria();
   }
 });
+
+/* Painel "Editar categorias": mostra as básicas do app (com cadeado, não dá
+   pra excluir) e as que o usuário cadastrou (com um × pra excluir). Excluir
+   aqui só remove a categoria da lista — lançamentos/orçamentos antigos que já
+   usavam esse nome continuam com o texto normalmente. */
+function atualizarListaGerenciarCategorias() {
+  const lista = document.getElementById("listaCategoriasGerenciar");
+  if (!lista) return;
+
+  const chipsPadrao = CATEGORIAS_PADRAO
+    .map(nome => `<span class="categoria-chip categoria-chip-locked">${escaparHTML(nome)}</span>`)
+    .join("");
+
+  const chipsPersonalizados = categorias
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+    .map(item => `
+      <span class="categoria-chip">
+        ${escaparHTML(item.nome)}
+        <button type="button" class="categoria-chip-delete" onclick="excluirCategoria(${item.id})" aria-label="Excluir categoria ${escaparHTML(item.nome)}">×</button>
+      </span>
+    `)
+    .join("");
+
+  lista.innerHTML = chipsPadrao + chipsPersonalizados;
+}
+
+document.getElementById("botaoGerenciarCategorias")?.addEventListener("click", () => {
+  const bloco = document.getElementById("blocoGerenciarCategorias");
+  if (!bloco) return;
+  document.getElementById("blocoNovaCategoria")?.classList.add("hidden");
+  bloco.classList.toggle("hidden");
+  if (!bloco.classList.contains("hidden")) atualizarListaGerenciarCategorias();
+});
+
+async function excluirCategoria(id) {
+  const item = categorias.find(c => c.id === id);
+  const nome = item?.nome || "esta categoria";
+
+  const confirmado = await mfConfirm(
+    `"${nome}" vai sair da sua lista de categorias. Lançamentos e orçamentos que já usam esse nome não são apagados.`,
+    { titulo: "Excluir categoria?", danger: true }
+  );
+  if (!confirmado) return;
+
+  const { error } = await supabaseClient
+    .from("categorias")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", usuarioAtual.id);
+
+  if (error) {
+    mfToast(mensagemErro(error, "Não foi possível excluir a categoria."));
+    return;
+  }
+
+  categorias = categorias.filter(item => item.id !== id);
+  atualizarOpcoesCategorias();
+  atualizarListaGerenciarCategorias();
+  mfToast("Categoria excluída.");
+}
 
 function mostrarPainelContasFixas(painel) {
   const exibindoGrupos = painel === "grupos";
@@ -2436,14 +2526,18 @@ function abrirPerfil() {
   document.getElementById("perfilNome").value = perfilAtual?.nome || "";
   document.getElementById("perfilNovoPin").value = "";
   document.getElementById("perfilConfirmarPin").value = "";
+  document.getElementById("perfilFoto").value = "";
 
   const preview = document.getElementById("previewPerfil");
+  const vazio = document.getElementById("previewPerfilVazio");
 
   if (perfilAtual?.avatar_url) {
     preview.src = perfilAtual.avatar_url;
     preview.classList.remove("hidden");
+    vazio.classList.add("hidden");
   } else {
     preview.classList.add("hidden");
+    vazio.classList.remove("hidden");
   }
 
   atualizarPainelNotificacoes();
