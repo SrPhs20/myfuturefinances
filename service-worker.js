@@ -1,5 +1,5 @@
-const CACHE_NAME = "my-future-finances-v24";
-const APP_SHELL = ["/", "/index.html", "/style.css?v=24", "/script.js?v=21", "/manifest.json", "/icon.svg"];
+const CACHE_NAME = "my-future-finances-v26";
+const APP_SHELL = ["/", "/index.html", "/style.css?v=26", "/script.js?v=23", "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
@@ -50,5 +50,39 @@ self.addEventListener("fetch", event => {
       caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
       return response;
     }))
+  );
+});
+
+/* Notificações push de vencimento (contas fixas e faturas de cartão).
+   Quem envia é a Edge Function check-vencimentos, chamada de fora do app
+   duas vezes ao dia; aqui só recebemos e exibimos. */
+self.addEventListener("push", event => {
+  let dados = { title: "Minhas Finanças", body: "Você tem um vencimento próximo." };
+  try {
+    if (event.data) dados = { ...dados, ...event.data.json() };
+  } catch {
+    // payload sem JSON válido: mantém o texto padrão.
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(dados.title, {
+      body: dados.body,
+      icon: "/icon.svg",
+      badge: "/icon.svg",
+      tag: "mf-vencimento",
+      renotify: true
+    })
+  );
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(listaClientes => {
+      for (const cliente of listaClientes) {
+        if ("focus" in cliente) return cliente.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow("/");
+    })
   );
 });

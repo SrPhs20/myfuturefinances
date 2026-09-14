@@ -1325,9 +1325,9 @@ tbody tr:hover { background: #f4f8f3; }
   isolation: isolate;
   color: #fff;
   background:
-    radial-gradient(circle at 50% 25%, rgba(57, 159, 107, .26), transparent 26rem),
-    radial-gradient(circle at 12% 86%, rgba(201, 155, 67, .13), transparent 22rem),
-    linear-gradient(145deg, #071b13 0%, #0b2b1e 48%, #123d2b 100%);
+    radial-gradient(circle at 50% 22%, rgba(34, 197, 94, .24), transparent 24rem),
+    radial-gradient(circle at 14% 88%, rgba(16, 185, 129, .10), transparent 22rem),
+    linear-gradient(160deg, #000000 0%, #030704 45%, #060c08 100%);
 }
 
 .auth-screen::before {
@@ -1436,8 +1436,8 @@ tbody tr:hover { background: #f4f8f3; }
   overflow: hidden;
   border: 4px solid rgba(230, 245, 234, .86);
   border-radius: 50%;
-  background: linear-gradient(145deg, #3aa872, #153e2d);
-  box-shadow: 0 22px 60px rgba(0, 0, 0, .38), 0 0 0 9px rgba(255, 255, 255, .045);
+  background: linear-gradient(145deg, #22c55e, #04140c);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, .5), 0 0 0 9px rgba(255, 255, 255, .045);
 }
 .gate-avatar-ring img { width: 100%; height: 100%; object-fit: cover; }
 .gate-initials { color: #fff; font-family: Georgia, serif; font-size: 3.2rem; font-weight: 800; letter-spacing: -.08em; }
@@ -1512,10 +1512,13 @@ tbody tr:hover { background: #f4f8f3; }
 .profile-pin-settings h3 { margin: 0 0 4px; color: var(--forest-900); }
 .profile-pin-settings p { margin: 0 0 10px; color: var(--muted); font-size: .78rem; }
 .profile-pin-settings input { margin-bottom: 8px; }
+.profile-pin-settings #botaoAtivarNotificacoes, .profile-pin-settings #botaoDesativarNotificacoes { margin-top: 4px; }
+.notification-settings-antecedencia { margin-top: 10px; }
+.notification-settings-antecedencia label { display: block; margin: 0 0 4px; }
 
 .profile-gate.pin-error .gate-avatar-button { animation: pinShake .38s ease; }
-.profile-gate.unlocking > *:not(.gate-avatar-button) { animation: gateFade .38s ease forwards; }
-.profile-gate.unlocking .gate-avatar-button { z-index: 4; animation: profileZoom .72s cubic-bezier(.65, 0, .35, 1) forwards; }
+.profile-gate.unlocking > *:not(.gate-avatar-button) { animation: gateFade .2s ease forwards; }
+.profile-gate.unlocking .gate-avatar-button { z-index: 4; animation: profileZoom .26s cubic-bezier(.65, 0, .35, 1) forwards; }
 
 @keyframes gateAppear { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes orbitFloat { 0%, 100% { transform: translate3d(0, 0, 0) rotate(-5deg); } 50% { transform: translate3d(0, -16px, 0) rotate(4deg); } }
@@ -1595,8 +1598,8 @@ tbody tr:hover { background: #f4f8f3; }
   font-size: 2.8rem;
   font-weight: 800;
   letter-spacing: -.07em;
-  background: linear-gradient(145deg, #3aa872, #153e2d);
-  box-shadow: 0 20px 42px rgba(0, 0, 0, .3), 0 0 0 7px rgba(255, 255, 255, .035);
+  background: linear-gradient(145deg, #22c55e, #04140c);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, .42), 0 0 0 7px rgba(255, 255, 255, .035);
   transition: border-color .22s ease, box-shadow .22s ease, transform .22s ease;
 }
 .account-profile-main:hover .account-profile-avatar { border-color: #c4ead0; box-shadow: 0 25px 55px rgba(0, 0, 0, .38), 0 0 0 8px rgba(181, 225, 195, .08); }

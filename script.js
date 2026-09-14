@@ -2,7 +2,8 @@ const SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYWZ5bHpucHJpYm1wdW1jZ3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzA1NzcsImV4cCI6MjA5NjcwNjU3N30.a1Tg7EAsusekhQ3gdUopSE4b0MDSbP-YQEiv3khQeI4";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const COLUNAS_PERFIL = "id,user_id,public_id,nome,avatar_url,created_at,updated_at,pin_length";
+const COLUNAS_PERFIL = "id,user_id,public_id,nome,avatar_url,created_at,updated_at,pin_length,notificar_vencimentos,notificar_antecedencia_dias";
+const VAPID_PUBLIC_KEY = "BBWpHWUBmp2CI8AErgUC8kYrc9ev7SUC0iBfu3S_--XinwgfGeqEeUpx9mn-XNQPHH02OqdTOXgmtpoqRanBQiE";
 const CONTAS_DISPOSITIVO_KEY = "myfuturefinances:contas:v1";
 
 let usuarioAtual = null;
@@ -114,7 +115,7 @@ document.body.insertAdjacentHTML("afterbegin", `
 
     <div id="pinPanel" class="pin-panel hidden">
       <label for="pinAcesso">Digite seu PIN</label>
-      <input id="pinAcesso" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" aria-describedby="pinMensagem" oninput="processarPin(this)" />
+      <input id="pinAcesso" class="pin-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-describedby="pinMensagem" oninput="processarPin(this)" />
       <div id="pinDots" class="pin-dots" aria-hidden="true"></div>
       <p id="pinMensagem" class="pin-message" aria-live="polite">A entrada acontece automaticamente.</p>
     </div>
@@ -169,6 +170,22 @@ appContainer.insertAdjacentHTML("afterbegin", `
         <input id="perfilNovoPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="4 a 8 números" oninput="limitarCampoPin(this)" />
         <label for="perfilConfirmarPin">Confirme o novo PIN</label>
         <input id="perfilConfirmarPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="Repita os números" oninput="limitarCampoPin(this)" />
+      </div>
+
+      <div class="profile-pin-settings">
+        <span class="eyebrow">Avisos</span>
+        <h3>Notificações de vencimento</h3>
+        <p>Receba um aviso quando uma conta fixa ou a fatura de um cartão estiver perto de vencer — funciona mesmo com o app fechado.</p>
+        <button type="button" id="botaoAtivarNotificacoes" onclick="ativarNotificacoes()">Ativar notificações</button>
+        <button type="button" class="secondary hidden" id="botaoDesativarNotificacoes" onclick="desativarNotificacoes()">Desativar notificações</button>
+        <div id="blocoAntecedenciaNotificacao" class="notification-settings-antecedencia hidden">
+          <label for="notificacaoAntecedencia">Avisar com quantos dias de antecedência?</label>
+          <select id="notificacaoAntecedencia" onchange="salvarAntecedenciaNotificacao(this)">
+            <option value="1">1 dia antes (manhã e noite)</option>
+            <option value="3">3 dias antes (todo dia)</option>
+            <option value="5">5 dias antes (todo dia)</option>
+          </select>
+        </div>
       </div>
 
       <button onclick="salvarPerfil()">Salvar perfil</button>
@@ -637,6 +654,7 @@ mfRealcarSelect("cartaoContaFixa", { comCor: true });
 mfRealcarSelect("cartaoParcelaId", { comCor: true });
 mfRealcarSelect("categoria");
 mfRealcarSelect("orcamentoCategoria");
+mfRealcarSelect("notificacaoAntecedencia");
 
 function formatarMoeda(valor) {
   return Number(valor).toLocaleString("pt-BR", {
@@ -1051,7 +1069,7 @@ function desbloquearAplicativo() {
     appContainer.classList.remove("hidden");
     validandoPin = false;
     window.scrollTo({ top: 0, behavior: "auto" });
-  }, 720);
+  }, 260);
 }
 
 async function sair() {
@@ -2427,6 +2445,8 @@ function abrirPerfil() {
   } else {
     preview.classList.add("hidden");
   }
+
+  atualizarPainelNotificacoes();
 }
 
 function fecharPerfil() {
@@ -2533,6 +2553,118 @@ async function salvarPerfil() {
   fecharPerfil();
 
   mfToast("Perfil atualizado com sucesso.");
+}
+
+/* Notificações push de vencimento — funcionam mesmo com o app fechado.
+   Quem decide o que enviar e quando é a Edge Function check-vencimentos,
+   chamada de fora duas vezes por dia; aqui só cuidamos de pedir permissão,
+   guardar a inscrição do navegador e a preferência do usuário. */
+function urlBase64ParaUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const dadosBrutos = atob(base64);
+  return Uint8Array.from([...dadosBrutos].map(caractere => caractere.charCodeAt(0)));
+}
+
+async function ativarNotificacoes() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    mfToast("Seu navegador não tem suporte a notificações.");
+    return;
+  }
+
+  let permissao;
+  try {
+    permissao = await Notification.requestPermission();
+  } catch (error) {
+    mfToast("Não foi possível pedir permissão para notificações.");
+    return;
+  }
+
+  if (permissao !== "granted") {
+    mfToast("Você precisa permitir notificações no navegador para receber os avisos.");
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    let assinatura = await registration.pushManager.getSubscription();
+    if (!assinatura) {
+      assinatura = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ParaUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    const dadosAssinatura = assinatura.toJSON();
+    const { error: erroAssinatura } = await supabaseClient.from("push_subscriptions").upsert({
+      user_id: usuarioAtual.id,
+      endpoint: dadosAssinatura.endpoint,
+      p256dh: dadosAssinatura.keys.p256dh,
+      auth: dadosAssinatura.keys.auth
+    }, { onConflict: "endpoint,user_id" });
+    if (erroAssinatura) throw erroAssinatura;
+
+    const { error: erroPerfil } = await supabaseClient
+      .from("perfis")
+      .update({ notificar_vencimentos: true })
+      .eq("user_id", usuarioAtual.id);
+    if (erroPerfil) throw erroPerfil;
+
+    perfilAtual = { ...perfilAtual, notificar_vencimentos: true };
+    atualizarPainelNotificacoes();
+    mfToast("Notificações ativadas!");
+  } catch (error) {
+    mfToast(mensagemErro(error, "Não foi possível ativar as notificações."));
+  }
+}
+
+async function desativarNotificacoes() {
+  const { error } = await supabaseClient
+    .from("perfis")
+    .update({ notificar_vencimentos: false })
+    .eq("user_id", usuarioAtual.id);
+
+  if (error) {
+    mfToast(mensagemErro(error, "Não foi possível desativar as notificações."));
+    return;
+  }
+
+  perfilAtual = { ...perfilAtual, notificar_vencimentos: false };
+  atualizarPainelNotificacoes();
+  mfToast("Notificações desativadas.");
+}
+
+async function salvarAntecedenciaNotificacao(seletor) {
+  const dias = Number(seletor.value);
+
+  const { error } = await supabaseClient
+    .from("perfis")
+    .update({ notificar_antecedencia_dias: dias })
+    .eq("user_id", usuarioAtual.id);
+
+  if (error) {
+    mfToast(mensagemErro(error, "Não foi possível salvar a antecedência."));
+    return;
+  }
+
+  perfilAtual = { ...perfilAtual, notificar_antecedencia_dias: dias };
+  mfToast("Antecedência de aviso atualizada.");
+}
+
+function atualizarPainelNotificacoes() {
+  const ativado = !!perfilAtual?.notificar_vencimentos;
+  const botaoAtivar = document.getElementById("botaoAtivarNotificacoes");
+  const botaoDesativar = document.getElementById("botaoDesativarNotificacoes");
+  const blocoAntecedencia = document.getElementById("blocoAntecedenciaNotificacao");
+  const seletorAntecedencia = document.getElementById("notificacaoAntecedencia");
+
+  if (botaoAtivar) botaoAtivar.classList.toggle("hidden", ativado);
+  if (botaoDesativar) botaoDesativar.classList.toggle("hidden", !ativado);
+  if (blocoAntecedencia) blocoAntecedencia.classList.toggle("hidden", !ativado);
+  if (seletorAntecedencia) {
+    seletorAntecedencia.value = String(perfilAtual?.notificar_antecedencia_dias || 3);
+    mfAtualizarSelectRealcado("notificacaoAntecedencia");
+  }
 }
 
 async function excluirPerfil() {
