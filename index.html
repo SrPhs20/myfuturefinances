@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=28" />
+  <link rel="stylesheet" href="style.css?v=29" />
 </head>
 <body>
   <div class="container">
@@ -196,7 +196,7 @@
           <label for="categoria">Categoria</label>
           <div class="categoria-field-actions">
             <button type="button" class="link-button small-button" id="botaoNovaCategoria">+ Nova</button>
-            <button type="button" class="link-button small-button" id="botaoGerenciarCategorias">Editar categorias</button>
+            <button type="button" class="link-button small-button" id="botaoModoEdicaoCategorias">Editar</button>
           </div>
         </div>
         <select id="categoria" required>
@@ -208,8 +208,8 @@
           <button type="button" class="secondary small-button" id="botaoSalvarCategoria">Adicionar</button>
         </div>
 
-        <div id="blocoGerenciarCategorias" class="categoria-manage-box hidden">
-          <span class="field-hint">Toque em uma categoria para selecioná-la. As com cadeado são padrão e não podem ser excluídas — toque no × para remover uma que você criou.</span>
+        <div id="painelCategorias" class="categoria-manage-box">
+          <span id="dicaCategorias" class="field-hint">Toque numa categoria para selecioná-la.</span>
           <div id="listaCategoriasGerenciar" class="categoria-chip-list"></div>
         </div>
 
@@ -556,6 +556,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=25"></script>
+  <script src="script.js?v=26"></script>
 </body>
 </html>

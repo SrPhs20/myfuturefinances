@@ -1274,9 +1274,31 @@ tbody tr:hover { background: #f4f8f3; }
   box-shadow: none;
 }
 .categoria-chip-label:hover { color: #fff; background: linear-gradient(135deg, var(--emerald-600), var(--forest-800)); box-shadow: none; transform: none; }
-.categoria-chip-locked { background: var(--mint-100); }
-.categoria-chip-locked .categoria-chip-label { color: var(--forest-800); }
-.categoria-chip-locked .categoria-chip-label::before { content: "🔒 "; font-size: .68rem; }
+
+.categoria-manage-box.modo-edicao {
+  border-color: var(--emerald-500);
+  background: var(--mint-100);
+  box-shadow: 0 0 0 3px rgba(49, 164, 111, .13);
+}
+.categoria-manage-box.modo-edicao .categoria-chip { border-color: #cce2d2; }
+
+.categoria-chip-input {
+  width: 96px;
+  min-height: 0;
+  margin: 0;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 650;
+  color: var(--forest-900);
+  background: #fff;
+}
+.categoria-chip-input:focus {
+  box-shadow: 0 0 0 2px rgba(49, 164, 111, .3);
+  border-color: transparent;
+}
+
 .categoria-chip-delete {
   width: 18px;
   height: 18px;

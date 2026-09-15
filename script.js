@@ -1236,6 +1236,7 @@ async function carregarDados() {
   orcamentos = resOrcamentos.data || [];
   objetivosFinanceiros = resObjetivos.data || [];
   categorias = resCategorias.data || [];
+  await garantirCategoriasSemente();
   if (!mesDashboard) mesDashboard = hojeTexto().slice(0, 7);
 }
 
@@ -1747,16 +1748,33 @@ function atualizarOpcoesCartoes() {
   mfAtualizarSelectRealcado("cartaoParcelaId");
 }
 
-/* Lista de categorias que aparece no seletor: as básicas do app + as que o
-   usuário cadastrou em "+ Nova categoria" + qualquer categoria antiga que já
-   estava em uso em lançamentos/orçamentos (assim nada que já existia some da
-   lista quando abre para editar). */
+/* Lista de categorias que aparece no seletor: as que estão na tabela
+   categorias (a semente inicial + o que o usuário adicionar/renomear) +
+   qualquer categoria antiga que já estava em uso em lançamentos/orçamentos
+   (assim nada que já existia some da lista quando abre para editar). */
 function listaCategorias() {
-  const nomes = new Set(CATEGORIAS_PADRAO);
+  const nomes = new Set();
   categorias.forEach(item => { if (item.nome) nomes.add(item.nome); });
   lancamentos.forEach(item => { if (item.categoria) nomes.add(item.categoria); });
   orcamentos.forEach(item => { if (item.categoria) nomes.add(item.categoria); });
   return Array.from(nomes).sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+/* Na primeira vez que o usuário usa o app, a tabela categorias está vazia —
+   aí a gente semeia com uma lista básica de dia a dia, já como linhas reais
+   dele (não mais um array fixo no código). A partir daí são categorias como
+   quaisquer outras: ele pode renomear, excluir ou adicionar à vontade, sem
+   nenhuma trava. */
+async function garantirCategoriasSemente() {
+  if (categorias.length > 0 || !usuarioAtual) return;
+
+  const linhas = CATEGORIAS_PADRAO.map(nome => ({ user_id: usuarioAtual.id, nome }));
+  const { data, error } = await supabaseClient
+    .from("categorias")
+    .insert(linhas)
+    .select("id, nome, user_id, created_at");
+
+  if (!error && data) categorias = data;
 }
 
 function atualizarOpcoesCategorias() {
@@ -1784,7 +1802,6 @@ function atualizarOpcoesCategorias() {
 document.getElementById("botaoNovaCategoria")?.addEventListener("click", () => {
   const bloco = document.getElementById("blocoNovaCategoria");
   if (!bloco) return;
-  document.getElementById("blocoGerenciarCategorias")?.classList.add("hidden");
   bloco.classList.toggle("hidden");
   if (!bloco.classList.contains("hidden")) document.getElementById("novaCategoriaNome").focus();
 });
@@ -1794,19 +1811,19 @@ async function salvarNovaCategoria() {
   const nome = campo.value.trim();
   if (!nome) return;
 
-  const { error } = await supabaseClient.from("categorias").insert([{
+  const { data, error } = await supabaseClient.from("categorias").insert([{
     user_id: usuarioAtual.id,
     nome
-  }]);
+  }]).select("id, nome, user_id, created_at").single();
 
   if (error) {
     mfToast(error.code === "23505" ? "Você já tem uma categoria com esse nome." : mensagemErro(error, "Não foi possível adicionar a categoria."));
     return;
   }
 
+  categorias.push(data);
   campo.value = "";
   document.getElementById("blocoNovaCategoria").classList.add("hidden");
-  await carregarDados();
   atualizarOpcoesCategorias();
   atualizarListaGerenciarCategorias();
   const seletorCategoria = document.getElementById("categoria");
@@ -1825,36 +1842,35 @@ document.getElementById("novaCategoriaNome")?.addEventListener("keydown", event 
   }
 });
 
-/* Painel "Editar categorias": mostra as básicas do app (com cadeado, não dá
-   pra excluir, mas dá pra escolher) e as que o usuário cadastrou (dá pra
-   escolher ou excluir com o ×). Escolher aqui já seleciona a categoria no
-   campo acima, igual escolher no seletor normal. Excluir só remove a
-   categoria da lista — lançamentos/orçamentos antigos que já usavam esse
-   nome continuam com o texto normalmente. */
+/* Lista fixa de categorias, sempre visível embaixo do seletor — sem cadeado
+   nenhum, tudo é editável. Tem dois modos:
+   - Normal: tocar numa categoria já seleciona ela no campo acima.
+   - Edição (botão "Editar"): cada categoria vira um campo de texto — é só
+     tocar e reescrever. Sai do campo (ou aperta Enter) e já salva. Também
+     aparece o × pra excluir. */
+let modoEdicaoCategorias = false;
+
 function atualizarListaGerenciarCategorias() {
   const lista = document.getElementById("listaCategoriasGerenciar");
   if (!lista) return;
 
-  const chipsPadrao = CATEGORIAS_PADRAO
-    .map(nome => `
-      <span class="categoria-chip categoria-chip-locked">
-        <button type="button" class="categoria-chip-label" data-nome="${escaparHTML(nome)}">${escaparHTML(nome)}</button>
-      </span>
-    `)
-    .join("");
+  const itensOrdenados = categorias.slice().sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
-  const chipsPersonalizados = categorias
-    .slice()
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-    .map(item => `
-      <span class="categoria-chip">
-        <button type="button" class="categoria-chip-label" data-nome="${escaparHTML(item.nome)}">${escaparHTML(item.nome)}</button>
+  if (!itensOrdenados.length) {
+    lista.innerHTML = '<p class="empty-state">Nenhuma categoria ainda.</p>';
+    return;
+  }
+
+  lista.innerHTML = itensOrdenados.map(item => modoEdicaoCategorias ? `
+      <span class="categoria-chip categoria-chip-editando">
+        <input type="text" class="categoria-chip-input" maxlength="40" data-id="${item.id}" data-nome-original="${escaparHTML(item.nome)}" value="${escaparHTML(item.nome)}" />
         <button type="button" class="categoria-chip-delete" onclick="excluirCategoria(${item.id})" aria-label="Excluir categoria ${escaparHTML(item.nome)}">×</button>
       </span>
-    `)
-    .join("");
-
-  lista.innerHTML = chipsPadrao + chipsPersonalizados;
+    ` : `
+      <span class="categoria-chip">
+        <button type="button" class="categoria-chip-label" data-nome="${escaparHTML(item.nome)}">${escaparHTML(item.nome)}</button>
+      </span>
+    `).join("");
 }
 
 document.getElementById("listaCategoriasGerenciar")?.addEventListener("click", event => {
@@ -1864,16 +1880,73 @@ document.getElementById("listaCategoriasGerenciar")?.addEventListener("click", e
   if (!seletorCategoria) return;
   seletorCategoria.value = botaoChip.dataset.nome;
   mfAtualizarSelectRealcado("categoria");
-  document.getElementById("blocoGerenciarCategorias")?.classList.add("hidden");
 });
 
-document.getElementById("botaoGerenciarCategorias")?.addEventListener("click", () => {
-  const bloco = document.getElementById("blocoGerenciarCategorias");
-  if (!bloco) return;
-  document.getElementById("blocoNovaCategoria")?.classList.add("hidden");
-  bloco.classList.toggle("hidden");
-  if (!bloco.classList.contains("hidden")) atualizarListaGerenciarCategorias();
+document.getElementById("listaCategoriasGerenciar")?.addEventListener("keydown", event => {
+  const campo = event.target.closest(".categoria-chip-input");
+  if (!campo) return;
+  if (event.key === "Enter") {
+    event.preventDefault();
+    campo.blur();
+  } else if (event.key === "Escape") {
+    campo.value = campo.dataset.nomeOriginal;
+    campo.blur();
+  }
 });
+
+document.getElementById("listaCategoriasGerenciar")?.addEventListener("focusout", event => {
+  const campo = event.target.closest(".categoria-chip-input");
+  if (campo) confirmarRenomeioCategoria(campo);
+});
+
+document.getElementById("botaoModoEdicaoCategorias")?.addEventListener("click", () => {
+  modoEdicaoCategorias = !modoEdicaoCategorias;
+  const botao = document.getElementById("botaoModoEdicaoCategorias");
+  const dica = document.getElementById("dicaCategorias");
+  if (botao) botao.textContent = modoEdicaoCategorias ? "Concluído" : "Editar";
+  if (dica) {
+    dica.textContent = modoEdicaoCategorias
+      ? "Toque numa categoria pra reescrever o nome, ou no × pra excluir."
+      : "Toque numa categoria para selecioná-la.";
+  }
+  document.getElementById("painelCategorias")?.classList.toggle("modo-edicao", modoEdicaoCategorias);
+  atualizarListaGerenciarCategorias();
+});
+
+async function confirmarRenomeioCategoria(campo) {
+  const id = Number(campo.dataset.id);
+  const nomeAtual = campo.dataset.nomeOriginal;
+  const novoNome = campo.value.trim();
+
+  if (!novoNome || novoNome === nomeAtual) {
+    campo.value = nomeAtual;
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("categorias")
+    .insert([{ user_id: usuarioAtual.id, nome: novoNome }])
+    .select("id, nome, user_id, created_at")
+    .single();
+
+  if (error) {
+    mfToast(error.code === "23505" ? "Você já tem uma categoria com esse nome." : mensagemErro(error, "Não foi possível renomear."));
+    campo.value = nomeAtual;
+    return;
+  }
+
+  await supabaseClient.from("categorias").delete().eq("id", id).eq("user_id", usuarioAtual.id);
+
+  categorias = categorias.filter(item => item.id !== id);
+  categorias.push(data);
+
+  const seletorCategoria = document.getElementById("categoria");
+  if (seletorCategoria && seletorCategoria.value === nomeAtual) seletorCategoria.value = novoNome;
+
+  atualizarOpcoesCategorias();
+  atualizarListaGerenciarCategorias();
+  mfToast("Categoria renomeada.");
+}
 
 async function excluirCategoria(id) {
   const item = categorias.find(c => c.id === id);
@@ -3738,6 +3811,7 @@ function atualizarPlanejamento() {
 
 function atualizarTudo() {
   atualizarOpcoesCategorias();
+  atualizarListaGerenciarCategorias();
   atualizarTela();
   atualizarContasFixas();
   atualizarGruposContas();
