@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=27" />
+  <link rel="stylesheet" href="style.css?v=28" />
 </head>
 <body>
   <div class="container">
@@ -209,7 +209,7 @@
         </div>
 
         <div id="blocoGerenciarCategorias" class="categoria-manage-box hidden">
-          <span class="field-hint">As categorias padrão (com cadeado) não podem ser excluídas. Toque no × para remover uma categoria que você criou.</span>
+          <span class="field-hint">Toque em uma categoria para selecioná-la. As com cadeado são padrão e não podem ser excluídas — toque no × para remover uma que você criou.</span>
           <div id="listaCategoriasGerenciar" class="categoria-chip-list"></div>
         </div>
 
@@ -272,11 +272,13 @@
         <div class="card">
           <h2>Em aberto</h2>
           <div id="totalFixasAbertas" class="value blue">R$ 0,00</div>
+          <span id="qtdFixasAbertas" class="value-count">0 contas</span>
         </div>
 
         <div class="card">
           <h2>Vencidas</h2>
           <div id="totalFixasVencidas" class="value negative">R$ 0,00</div>
+          <span id="qtdFixasVencidas" class="value-count">0 contas</span>
         </div>
       </div>
 
@@ -554,6 +556,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=24"></script>
+  <script src="script.js?v=25"></script>
 </body>
 </html>

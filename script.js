@@ -21,11 +21,11 @@ let categorias = [];
 let mesDashboard = null;
 
 /* Categorias básicas que o app já sugere para todo mundo, mesmo sem o
-   usuário ter cadastrado nenhuma ainda. As que ele adicionar em "+ Nova
-   categoria" ficam salvas na tabela categorias e se somam a essa lista. */
+   usuário ter cadastrado nenhuma ainda — mantidas no mínimo possível, só o
+   dia a dia mesmo. Qualquer outra o usuário cria em "+ Nova categoria", e
+   essas ficam salvas na tabela categorias, somando-se a essa lista. */
 const CATEGORIAS_PADRAO = [
-  "Alimentação", "Moradia", "Transporte", "Saúde", "Educação", "Lazer",
-  "Assinaturas", "Salário", "Investimentos", "Conta fixa", "Cartão de crédito", "Outros"
+  "Alimentação", "Moradia", "Transporte", "Saúde", "Educação", "Lazer", "Salário", "Outros"
 ];
 
 let editandoId = null;
@@ -37,6 +37,7 @@ let editandoContaFixaId = null;
 let editandoCartaoRegistradoId = null;
 let editandoOrcamentoId = null;
 let editandoObjetivoId = null;
+let calendarioObjetivoPrazo;
 let filtroCompromissos = "mes";
 let compromissosExpandidos = false;
 let validandoPin = false;
@@ -82,8 +83,10 @@ document.body.insertAdjacentHTML("afterbegin", `
     <input id="novaContaFoto" class="hidden" type="file" accept="image/jpeg,image/png,image/webp" onchange="mostrarPreviewNovaConta(this)" />
 
     <div class="create-fields">
-      <label for="novaContaNome">Seu nome</label>
-      <input id="novaContaNome" type="text" maxlength="80" autocomplete="name" placeholder="Como quer ser chamado?" />
+      <label for="novaContaNome">Nome</label>
+      <input id="novaContaNome" type="text" maxlength="40" autocomplete="given-name" placeholder="Seu nome" />
+      <label for="novaContaSobrenome">Sobrenome <span class="optional-label">opcional</span></label>
+      <input id="novaContaSobrenome" type="text" maxlength="40" autocomplete="family-name" placeholder="Seu sobrenome" />
       <label for="novaContaPin">Crie uma senha numérica</label>
       <input id="novaContaPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="8" autocomplete="new-password" placeholder="4 a 8 números" oninput="limitarCampoPin(this)" />
       <label for="novaContaPinConfirmacao">Confirme a senha</label>
@@ -141,7 +144,10 @@ appContainer.insertAdjacentHTML("afterbegin", `
   <div class="user-bar">
     <div class="profile-preview">
       <img id="fotoPerfilTopo" class="profile-avatar hidden" />
-      <span id="usuarioLogado"></span>
+      <div class="profile-preview-text">
+        <span id="usuarioLogado"></span>
+        <span id="saldoHeader" class="header-balance"></span>
+      </div>
     </div>
 
     <div class="profile-actions">
@@ -163,8 +169,12 @@ appContainer.insertAdjacentHTML("afterbegin", `
           <span class="profile-photo-edit" aria-hidden="true">✎</span>
         </button>
         <input id="perfilFoto" type="file" accept="image/*" class="hidden" />
-        <label for="perfilNome" class="hidden">Nome</label>
-        <input id="perfilNome" type="text" class="profile-name-input" placeholder="Seu nome" />
+        <div class="profile-name-fields">
+          <label for="perfilNome" class="hidden">Nome</label>
+          <input id="perfilNome" type="text" class="profile-name-input" placeholder="Nome" />
+          <label for="perfilSobrenome" class="hidden">Sobrenome</label>
+          <input id="perfilSobrenome" type="text" class="profile-name-input" placeholder="Sobrenome" />
+        </div>
       </div>
 
       <div class="profile-pin-settings">
@@ -682,6 +692,9 @@ mfRealcarSelect("cartaoParcelaId", { comCor: true });
 mfRealcarSelect("categoria");
 mfRealcarSelect("orcamentoCategoria");
 mfRealcarSelect("notificacaoAntecedencia");
+mfRealcarSelect("tipo");
+mfRealcarSelect("filtroTipo");
+mfRealcarSelect("objetivoTipo");
 
 function formatarMoeda(valor) {
   return Number(valor).toLocaleString("pt-BR", {
@@ -841,14 +854,16 @@ function mostrarPreviewNovaConta(campo) {
 }
 
 async function criarContaPorPerfil() {
-  const nome = document.getElementById("novaContaNome").value.trim();
+  const primeiroNome = document.getElementById("novaContaNome").value.trim();
+  const sobrenome = document.getElementById("novaContaSobrenome").value.trim();
+  const nome = [primeiroNome, sobrenome].filter(Boolean).join(" ");
   const pin = document.getElementById("novaContaPin").value;
   const confirmacao = document.getElementById("novaContaPinConfirmacao").value;
   const foto = document.getElementById("novaContaFoto").files?.[0];
   const mensagem = document.getElementById("createAccountMessage");
   const botao = document.getElementById("botaoCriarConta");
 
-  if (nome.length < 2) return mensagem.textContent = "Digite seu nome.";
+  if (primeiroNome.length < 2) return mensagem.textContent = "Digite seu nome.";
   if (!/^\d{4,8}$/.test(pin)) return mensagem.textContent = "Crie uma senha com 4 a 8 números.";
   if (pin !== confirmacao) return mensagem.textContent = "As duas senhas precisam ser iguais.";
   if (foto && !foto.type.startsWith("image/")) return mensagem.textContent = "Escolha uma foto válida.";
@@ -888,6 +903,7 @@ async function criarContaPorPerfil() {
     await supabaseClient.auth.signOut({ scope: "local" });
     usuarioAtual = null;
     document.getElementById("novaContaNome").value = "";
+    document.getElementById("novaContaSobrenome").value = "";
     document.getElementById("novaContaPin").value = "";
     document.getElementById("novaContaPinConfirmacao").value = "";
     document.getElementById("novaContaFoto").value = "";
@@ -1278,10 +1294,22 @@ function configurarCalendarios() {
     });
   }
 
+  if (!calendarioObjetivoPrazo) {
+    calendarioObjetivoPrazo = flatpickr("#objetivoPrazo", {
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d/m/Y",
+      locale: "pt",
+      allowInput: false
+    });
+  }
+
 }
 
 function limparFormularioLancamento() {
   form.reset();
+  mfAtualizarSelectRealcado("tipo");
+  mfAtualizarSelectRealcado("categoria");
 
   if (calendarioData) {
     calendarioData.setDate(hojeTexto(), true);
@@ -1412,6 +1440,8 @@ function editarLancamento(id) {
   document.getElementById("categoria").value = item.categoria;
   document.getElementById("descricao").value = item.descricao;
   document.getElementById("valor").value = item.valor;
+  mfAtualizarSelectRealcado("tipo");
+  mfAtualizarSelectRealcado("categoria");
 
   if (calendarioData) {
     calendarioData.setDate(item.data, true);
@@ -1569,12 +1599,18 @@ function atualizarContasFixas() {
   let totalFixas = contasFixas.reduce((total, conta) => total + Number(conta.valor), 0);
   let totalAbertas = 0;
   let totalVencidas = 0;
+  let qtdAbertas = 0;
+  let qtdVencidas = 0;
 
   const hoje = hojeTexto();
 
   contasFixas.forEach(conta => {
     totalAbertas += Number(conta.valor);
-    if (conta.vencimento < hoje) totalVencidas += Number(conta.valor);
+    qtdAbertas++;
+    if (conta.vencimento < hoje) {
+      totalVencidas += Number(conta.valor);
+      qtdVencidas++;
+    }
   });
 
   if (contasFixas.length === 0) {
@@ -1648,6 +1684,8 @@ div.className = contaEhDoMesAtual
   document.getElementById("totalFixas").textContent = formatarMoeda(totalFixas);
   document.getElementById("totalFixasAbertas").textContent = formatarMoeda(totalAbertas);
   document.getElementById("totalFixasVencidas").textContent = formatarMoeda(totalVencidas);
+  document.getElementById("qtdFixasAbertas").textContent = `${qtdAbertas} conta${qtdAbertas === 1 ? "" : "s"} em aberto`;
+  document.getElementById("qtdFixasVencidas").textContent = `${qtdVencidas} conta${qtdVencidas === 1 ? "" : "s"} vencida${qtdVencidas === 1 ? "" : "s"}`;
   document.getElementById("totalGrupoFiltrado").textContent = formatarMoeda(
     contasFiltradas.reduce((total, conta) => total + Number(conta.valor), 0)
   );
@@ -1788,15 +1826,21 @@ document.getElementById("novaCategoriaNome")?.addEventListener("keydown", event 
 });
 
 /* Painel "Editar categorias": mostra as básicas do app (com cadeado, não dá
-   pra excluir) e as que o usuário cadastrou (com um × pra excluir). Excluir
-   aqui só remove a categoria da lista — lançamentos/orçamentos antigos que já
-   usavam esse nome continuam com o texto normalmente. */
+   pra excluir, mas dá pra escolher) e as que o usuário cadastrou (dá pra
+   escolher ou excluir com o ×). Escolher aqui já seleciona a categoria no
+   campo acima, igual escolher no seletor normal. Excluir só remove a
+   categoria da lista — lançamentos/orçamentos antigos que já usavam esse
+   nome continuam com o texto normalmente. */
 function atualizarListaGerenciarCategorias() {
   const lista = document.getElementById("listaCategoriasGerenciar");
   if (!lista) return;
 
   const chipsPadrao = CATEGORIAS_PADRAO
-    .map(nome => `<span class="categoria-chip categoria-chip-locked">${escaparHTML(nome)}</span>`)
+    .map(nome => `
+      <span class="categoria-chip categoria-chip-locked">
+        <button type="button" class="categoria-chip-label" data-nome="${escaparHTML(nome)}">${escaparHTML(nome)}</button>
+      </span>
+    `)
     .join("");
 
   const chipsPersonalizados = categorias
@@ -1804,7 +1848,7 @@ function atualizarListaGerenciarCategorias() {
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
     .map(item => `
       <span class="categoria-chip">
-        ${escaparHTML(item.nome)}
+        <button type="button" class="categoria-chip-label" data-nome="${escaparHTML(item.nome)}">${escaparHTML(item.nome)}</button>
         <button type="button" class="categoria-chip-delete" onclick="excluirCategoria(${item.id})" aria-label="Excluir categoria ${escaparHTML(item.nome)}">×</button>
       </span>
     `)
@@ -1812,6 +1856,16 @@ function atualizarListaGerenciarCategorias() {
 
   lista.innerHTML = chipsPadrao + chipsPersonalizados;
 }
+
+document.getElementById("listaCategoriasGerenciar")?.addEventListener("click", event => {
+  const botaoChip = event.target.closest(".categoria-chip-label");
+  if (!botaoChip) return;
+  const seletorCategoria = document.getElementById("categoria");
+  if (!seletorCategoria) return;
+  seletorCategoria.value = botaoChip.dataset.nome;
+  mfAtualizarSelectRealcado("categoria");
+  document.getElementById("blocoGerenciarCategorias")?.classList.add("hidden");
+});
 
 document.getElementById("botaoGerenciarCategorias")?.addEventListener("click", () => {
   const bloco = document.getElementById("blocoGerenciarCategorias");
@@ -2059,6 +2113,13 @@ function atualizarResumoGeral() {
   const contasEmAberto = contasFixas.reduce((total, conta) => total + Number(conta.valor), 0);
   const compromissos = contasEmAberto + dividaCartoesTotal();
   const saldoLiquido = saldoAcumulado - compromissos;
+
+  const saldoHeaderEl = document.getElementById("saldoHeader");
+  if (saldoHeaderEl) {
+    saldoHeaderEl.textContent = `Saldo: ${formatarMoeda(saldoAcumulado)}`;
+    saldoHeaderEl.classList.toggle("negative", saldoAcumulado < 0);
+    saldoHeaderEl.classList.toggle("positive", saldoAcumulado >= 0);
+  }
 
   const campos = {
     saldoAcumuladoGeral: saldoAcumulado,
@@ -2523,7 +2584,9 @@ async function carregarPerfil() {
 function abrirPerfil() {
   document.getElementById("modalPerfil").classList.remove("hidden");
 
-  document.getElementById("perfilNome").value = perfilAtual?.nome || "";
+  const partesNome = String(perfilAtual?.nome || "").trim().split(/\s+/).filter(Boolean);
+  document.getElementById("perfilNome").value = partesNome[0] || "";
+  document.getElementById("perfilSobrenome").value = partesNome.length > 1 ? partesNome.at(-1) : "";
   document.getElementById("perfilNovoPin").value = "";
   document.getElementById("perfilConfirmarPin").value = "";
   document.getElementById("perfilFoto").value = "";
@@ -2549,7 +2612,9 @@ function fecharPerfil() {
 
 async function salvarPerfil() {
 
-  const nome = document.getElementById("perfilNome").value.trim();
+  const primeiroNome = document.getElementById("perfilNome").value.trim();
+  const sobrenome = document.getElementById("perfilSobrenome").value.trim();
+  const nome = [primeiroNome, sobrenome].filter(Boolean).join(" ");
   const novoPin = document.getElementById("perfilNovoPin").value;
   const confirmarNovoPin = document.getElementById("perfilConfirmarPin").value;
 
@@ -3605,9 +3670,15 @@ function editarObjetivo(id) {
   editandoObjetivoId = id;
   document.getElementById("objetivoNome").value = item.nome;
   document.getElementById("objetivoTipo").value = item.tipo;
+  mfAtualizarSelectRealcado("objetivoTipo");
   document.getElementById("objetivoValorAlvo").value = item.valor_alvo;
   document.getElementById("objetivoValorAtual").value = item.valor_atual;
-  document.getElementById("objetivoPrazo").value = item.prazo || "";
+  if (calendarioObjetivoPrazo) {
+    if (item.prazo) calendarioObjetivoPrazo.setDate(item.prazo, true);
+    else calendarioObjetivoPrazo.clear();
+  } else {
+    document.getElementById("objetivoPrazo").value = item.prazo || "";
+  }
   document.getElementById("tituloFormObjetivo").textContent = "Editar objetivo";
   document.getElementById("botaoObjetivo").textContent = "Salvar alterações";
   document.getElementById("cancelarObjetivo").classList.remove("hidden");
@@ -3616,6 +3687,8 @@ function editarObjetivo(id) {
 function cancelarEdicaoObjetivo() {
   editandoObjetivoId = null;
   document.getElementById("formObjetivo").reset();
+  mfAtualizarSelectRealcado("objetivoTipo");
+  if (calendarioObjetivoPrazo) calendarioObjetivoPrazo.clear();
   document.getElementById("objetivoValorAtual").value = 0;
   document.getElementById("tituloFormObjetivo").textContent = "Transforme um plano em número";
   document.getElementById("botaoObjetivo").textContent = "Salvar objetivo";
