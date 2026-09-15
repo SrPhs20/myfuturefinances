@@ -1604,10 +1604,18 @@ function atualizarContasFixas() {
   let qtdVencidas = 0;
 
   const hoje = hojeTexto();
+  const mesAtual = hoje.slice(0, 7);
 
+  /* "Em aberto" é só o que ainda pesa neste mês: contas com vencimento até
+     o fim do mês atual e que ainda não foram pagas. Uma conta que já foi
+     paga tem o vencimento empurrado pro mês seguinte (ver pagarContaFixa),
+     então ela sai daqui sozinha assim que for marcada como paga — só continua
+     contando se venceu e ainda não foi paga (aí ela é "vencida" também). */
   contasFixas.forEach(conta => {
-    totalAbertas += Number(conta.valor);
-    qtdAbertas++;
+    if (conta.vencimento?.slice(0, 7) <= mesAtual) {
+      totalAbertas += Number(conta.valor);
+      qtdAbertas++;
+    }
     if (conta.vencimento < hoje) {
       totalVencidas += Number(conta.valor);
       qtdVencidas++;
@@ -1685,7 +1693,7 @@ div.className = contaEhDoMesAtual
   document.getElementById("totalFixas").textContent = formatarMoeda(totalFixas);
   document.getElementById("totalFixasAbertas").textContent = formatarMoeda(totalAbertas);
   document.getElementById("totalFixasVencidas").textContent = formatarMoeda(totalVencidas);
-  document.getElementById("qtdFixasAbertas").textContent = `${qtdAbertas} conta${qtdAbertas === 1 ? "" : "s"} em aberto`;
+  document.getElementById("qtdFixasAbertas").textContent = `${qtdAbertas} conta${qtdAbertas === 1 ? "" : "s"} em aberto no mês`;
   document.getElementById("qtdFixasVencidas").textContent = `${qtdVencidas} conta${qtdVencidas === 1 ? "" : "s"} vencida${qtdVencidas === 1 ? "" : "s"}`;
   document.getElementById("totalGrupoFiltrado").textContent = formatarMoeda(
     contasFiltradas.reduce((total, conta) => total + Number(conta.valor), 0)
