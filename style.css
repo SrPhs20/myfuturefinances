@@ -94,6 +94,24 @@ table {
   font-size: 15px;
   color: #64748b;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.card-icon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  color: currentColor;
+  opacity: .85;
+}
+
+.button-icon {
+  width: 15px;
+  height: 15px;
+  vertical-align: -3px;
+  margin-right: 5px;
 }
 
 .value {
@@ -219,6 +237,9 @@ button:active {
 
 .chart h2 {
   margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .bar {
@@ -1741,6 +1762,18 @@ tbody tr:hover { background: #f4f8f3; }
   color: #f2fff6;
 }
 .profile-security-box input::placeholder { color: #7f9d8c; }
+
+.profile-notif-bell {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--mint-100);
+  color: var(--emerald-600);
+}
+.profile-notif-bell svg { width: 17px; height: 17px; }
 
 .profile-security-lock {
   width: 34px;

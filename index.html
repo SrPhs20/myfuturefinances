@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=29" />
+  <link rel="stylesheet" href="style.css?v=30" />
 </head>
 <body>
   <div class="container">
@@ -72,22 +72,22 @@
 
       <div class="cards">
         <div class="card">
-          <h2>Saldo do mês</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6.5" width="18" height="12" rx="2.5"/><path d="M3 10.5h18" stroke-linecap="round"/><circle cx="16.5" cy="14.5" r="1" fill="currentColor" stroke="none"/></svg>Saldo do mês</h2>
           <div id="dashSaldoAtual" class="value blue">R$ 0,00</div>
         </div>
 
         <div class="card">
-          <h2>Pendências do mês</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>Pendências do mês</h2>
           <div id="dashContasPendentes" class="value negative">R$ 0,00</div>
         </div>
 
         <div class="card">
-          <h2>Saldo previsto do mês</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 16l5.5-6 4 4L21 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.5 6H21v5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Saldo previsto do mês</h2>
           <div id="dashSaldoPrevisto" class="value positive">R$ 0,00</div>
         </div>
 
         <div class="card">
-          <h2>Taxa de economia</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="7" cy="7" r="2.3"/><circle cx="17" cy="17" r="2.3"/><path d="M5.5 18.5l13-13" stroke-linecap="round"/></svg>Taxa de economia</h2>
           <div id="dashEconomiaMes" class="value blue">0%</div>
         </div>
       </div>
@@ -103,7 +103,7 @@
         </article>
         <article class="chart reserve-card">
           <span class="eyebrow">Proteção</span>
-          <h2>Reserva de emergência</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3.5l7 2.8v5.2c0 5-3 7.9-7 9-4-1.1-7-4-7-9V6.3l7-2.8z" stroke-linejoin="round"/></svg>Reserva de emergência</h2>
           <div class="bar-label"><span id="reservaAtual">R$ 0,00 guardados</span><span id="reservaPercentual">0%</span></div>
           <div class="meta-bar"><div id="barraReserva" class="meta-fill reserve-fill"></div></div>
           <p id="textoReserva">Cadastre uma meta de reserva no Planejamento.</p>
@@ -112,19 +112,19 @@
 
       <div class="dashboard-columns">
         <div class="chart">
-          <div class="section-heading"><div><span class="eyebrow">Evolução</span><h2>Receitas x despesas — 6 meses</h2></div><div class="chart-legend"><span class="legend-income">Receitas</span><span class="legend-expense">Despesas</span></div></div>
+          <div class="section-heading"><div><span class="eyebrow">Evolução</span><h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 16l5.5-6 4 4L21 6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.5 6H21v5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Receitas x despesas — 6 meses</h2></div><div class="chart-legend"><span class="legend-income">Receitas</span><span class="legend-expense">Despesas</span></div></div>
           <div id="graficoTendencia" class="trend-chart"></div>
         </div>
         <div class="chart">
           <span class="eyebrow">Ação recomendada</span>
-          <h2>Seu copiloto financeiro</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 18h6M10 21h4" stroke-linecap="round"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.45 1 1.15 1 1.9v.2h5v-.2c0-.75.4-1.45 1-1.9A6 6 0 0 0 12 3z" stroke-linejoin="round"/></svg>Seu copiloto financeiro</h2>
           <div id="listaInsights" class="insight-list"></div>
         </div>
       </div>
 
       <div class="chart">
         <div class="section-heading commitments-heading">
-          <div><span class="eyebrow">Agenda financeira</span><h2>Próximos compromissos</h2></div>
+          <div><span class="eyebrow">Agenda financeira</span><h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17" stroke-linecap="round"/><path d="M8 3v4M16 3v4" stroke-linecap="round"/></svg>Próximos compromissos</h2></div>
           <div class="commitment-actions">
             <div class="commitment-filters" aria-label="Filtrar compromissos">
               <button id="filtroCompromissosMes" class="filter-chip active" type="button" onclick="definirFiltroCompromissos('mes')">Este mês</button>
@@ -139,7 +139,7 @@
       </div>
 
       <div class="chart">
-        <h2>Meta mensal</h2>
+        <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none"/></svg>Meta mensal</h2>
 
         <form id="formMeta">
           <label>Quanto você quer guardar no mês analisado?</label>
@@ -165,17 +165,17 @@
     <section id="abaLancamentos" class="hidden">
       <div class="cards">
         <div class="card">
-          <h2>Receitas</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 16V8M8.5 11.5L12 8l3.5 3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Receitas</h2>
           <div id="totalReceitas" class="value positive">R$ 0,00</div>
         </div>
 
         <div class="card">
-          <h2>Despesas</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8.5 12.5L12 16l3.5-3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Despesas</h2>
           <div id="totalDespesas" class="value negative">R$ 0,00</div>
         </div>
 
         <div class="card">
-          <h2>Saldo</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6.5" width="18" height="12" rx="2.5"/><path d="M3 10.5h18" stroke-linecap="round"/><circle cx="16.5" cy="14.5" r="1" fill="currentColor" stroke="none"/></svg>Saldo</h2>
           <div id="saldo" class="value blue">R$ 0,00</div>
         </div>
       </div>
@@ -243,7 +243,7 @@
       </div>
 
       <div class="chart">
-        <h2>Despesas por categoria</h2>
+        <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v9l7.5 4.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"/></svg>Despesas por categoria</h2>
         <div id="grafico"></div>
       </div>
 
@@ -265,18 +265,18 @@
     <section id="abaContas" class="hidden">
       <div class="cards">
         <div class="card">
-          <h2>Total fixo mensal</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17" stroke-linecap="round"/><path d="M8 3v4M16 3v4" stroke-linecap="round"/><path d="M8 14l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>Total fixo mensal</h2>
           <div id="totalFixas" class="value negative">R$ 0,00</div>
         </div>
 
         <div class="card">
-          <h2>Em aberto no mês</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>Em aberto no mês</h2>
           <div id="totalFixasAbertas" class="value blue">R$ 0,00</div>
           <span id="qtdFixasAbertas" class="value-count">0 contas</span>
         </div>
 
         <div class="card">
-          <h2>Vencidas</h2>
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3.5l9.5 16.5H2.5z" stroke-linejoin="round"/><path d="M12 10v4" stroke-linecap="round"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>Vencidas</h2>
           <div id="totalFixasVencidas" class="value negative">R$ 0,00</div>
           <span id="qtdFixasVencidas" class="value-count">0 contas</span>
         </div>
@@ -328,7 +328,7 @@
           <div class="fixed-list-heading">
             <div>
               <span class="eyebrow">Visão mensal</span>
-              <h2>Minhas contas fixas</h2>
+              <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17" stroke-linecap="round"/><path d="M7 14.5h4" stroke-linecap="round"/></svg>Minhas contas fixas</h2>
             </div>
             <div class="group-filter-control">
               <label for="filtroGrupoConta">Filtrar por grupo</label>
@@ -350,7 +350,7 @@
         <form id="formGrupoConta" class="group-create-form">
           <div>
             <span class="eyebrow">Organize do seu jeito</span>
-            <h2>Criar um novo grupo</h2>
+            <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="4.5" width="8" height="8" rx="2"/><rect x="12.5" y="4.5" width="8" height="8" rx="2"/><rect x="3.5" y="14.5" width="8" height="5" rx="2"/><rect x="12.5" y="14.5" width="8" height="5" rx="2"/></svg>Criar um novo grupo</h2>
             <p>Crie grupos como Streaming, Estudos, Moradia ou qualquer outro que faça sentido para você.</p>
           </div>
           <div class="group-create-fields">
@@ -366,7 +366,7 @@
           <div class="fixed-list-heading">
             <div>
               <span class="eyebrow">Categorias reutilizáveis</span>
-              <h2>Meus grupos</h2>
+              <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="4.5" width="8" height="8" rx="2"/><rect x="12.5" y="4.5" width="8" height="8" rx="2"/><rect x="3.5" y="14.5" width="8" height="5" rx="2"/><rect x="12.5" y="14.5" width="8" height="5" rx="2"/></svg>Meus grupos</h2>
             </div>
             <span class="soft-pill" id="resumoGruposContas">0 grupos</span>
           </div>
@@ -378,17 +378,17 @@
     <section id="abaCartoes" class="hidden">
   <div class="cards">
     <div class="card">
-      <h2>Total em aberto nos cartões</h2>
+      <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 9.5h18" stroke-linecap="round"/><path d="M6.5 14.5h5" stroke-linecap="round"/></svg>Total em aberto nos cartões</h2>
       <div id="totalCartoesAberto" class="value negative">R$ 0,00</div>
     </div>
 
     <div class="card">
-      <h2>Parcelas pendentes</h2>
+      <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l8 4.5-8 4.5-8-4.5z" stroke-linejoin="round"/><path d="M4 12l8 4.5 8-4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16.5l8 4.5 8-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Parcelas pendentes</h2>
       <div id="totalParcelasPendentes" class="value blue">0</div>
     </div>
 
     <div class="card">
-      <h2>Compras quitadas</h2>
+      <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.6 2.6L16 9.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Compras quitadas</h2>
       <div id="totalComprasQuitadas" class="value positive">0</div>
     </div>
   </div>
@@ -402,7 +402,7 @@
     <form id="formNovoCartao" class="group-create-form">
       <div>
         <span class="eyebrow">Organize por cartão</span>
-        <h2 id="tituloFormNovoCartao">Cadastrar um cartão</h2>
+        <h2 id="tituloFormNovoCartao"><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 9.5h18" stroke-linecap="round"/><path d="M6.5 14.5h5" stroke-linecap="round"/></svg>Cadastrar um cartão</h2>
         <p>Cadastre seus cartões para vincular assinaturas, contas fixas pagas neles e compras parceladas.</p>
       </div>
       <div class="group-create-fields">
@@ -432,7 +432,7 @@
     <form id="formCartao">
       <div class="form-intro">
         <span class="eyebrow">Compra nova ou dívida que já existia</span>
-        <h2 id="tituloFormCartao">Registrar no cartão</h2>
+        <h2 id="tituloFormCartao"><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l8 4.5-8 4.5-8-4.5z" stroke-linejoin="round"/><path d="M4 12l8 4.5 8-4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16.5l8 4.5 8-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Registrar no cartão</h2>
         <p>Serve tanto para uma compra que você acabou de fazer quanto para uma dívida antiga que ainda está sendo cobrada na fatura: escolha a data da primeira parcela no passado e informe quantas já foram pagas. O valor que ainda falta pagar entra automaticamente no limite do cartão e vai sumindo conforme você for pagando as parcelas.</p>
       </div>
 
@@ -471,7 +471,7 @@
     <div class="fixed-list-heading">
       <div>
         <span class="eyebrow">Meus cartões</span>
-        <h2>Cartões cadastrados</h2>
+        <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 9.5h18" stroke-linecap="round"/><path d="M6.5 14.5h5" stroke-linecap="round"/></svg>Cartões cadastrados</h2>
       </div>
       <span class="soft-pill" id="resumoCartoesRegistrados">0 cartões</span>
     </div>
@@ -481,14 +481,14 @@
   <div id="detalheCartaoSelecionado" class="chart hidden"></div>
 
   <div class="chart">
-    <h2>Minhas compras parceladas</h2>
+    <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l8 4.5-8 4.5-8-4.5z" stroke-linejoin="round"/><path d="M4 12l8 4.5 8-4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16.5l8 4.5 8-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Minhas compras parceladas</h2>
     <div id="listaCartoes"></div>
   </div>
 </section>
 
     <section id="abaPlanejamento" class="hidden">
       <div class="planning-hero">
-        <div><span class="eyebrow">Estratégia</span><h2>Dê um trabalho para cada real</h2><p>Defina limites para não gastar no automático e transforme sonhos em metas mensuráveis.</p></div>
+        <div><span class="eyebrow">Estratégia</span><h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.5 9.7c0-1.2 1.1-2.2 2.5-2.2s2.5.8 2.5 2c0 2.5-5 1.8-5 4.3 0 1.2 1.1 2.2 2.5 2.2s2.5-1 2.5-2.2" stroke-linecap="round"/></svg>Dê um trabalho para cada real</h2><p>Defina limites para não gastar no automático e transforme sonhos em metas mensuráveis.</p></div>
         <div class="planning-total"><span>Disponível nos orçamentos</span><strong id="saldoOrcamentos">R$ 0,00</strong></div>
       </div>
 
@@ -496,7 +496,7 @@
         <div>
           <form id="formOrcamento" class="planning-form">
             <span class="eyebrow">Orçamento por categoria</span>
-            <h2 id="tituloFormOrcamento">Criar limite mensal</h2>
+            <h2 id="tituloFormOrcamento"><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none"/></svg>Criar limite mensal</h2>
             <label>Categoria</label>
             <select id="orcamentoCategoria" required>
               <option value="">Selecione</option>
@@ -506,13 +506,13 @@
             <button id="botaoOrcamento" type="submit">Salvar orçamento</button>
             <button id="cancelarOrcamento" type="button" class="secondary hidden" onclick="cancelarEdicaoOrcamento()">Cancelar edição</button>
           </form>
-          <div class="chart"><div class="section-heading"><div><span class="eyebrow">Limites do mês</span><h2>Orçamentos</h2></div><span id="resumoOrcamentos" class="soft-pill">Nenhum criado</span></div><div id="listaOrcamentos"></div></div>
+          <div class="chart"><div class="section-heading"><div><span class="eyebrow">Limites do mês</span><h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v9l7.5 4.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round"/></svg>Orçamentos</h2></div><span id="resumoOrcamentos" class="soft-pill">Nenhum criado</span></div><div id="listaOrcamentos"></div></div>
         </div>
 
         <div>
           <form id="formObjetivo" class="planning-form">
             <span class="eyebrow">Objetivos financeiros</span>
-            <h2 id="tituloFormObjetivo">Transforme um plano em número</h2>
+            <h2 id="tituloFormObjetivo"><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3v18" stroke-linecap="round"/><path d="M6 4.5h11l-2.5 3.5L17 11.5H6" stroke-linejoin="round"/></svg>Transforme um plano em número</h2>
             <label>Nome do objetivo</label>
             <input id="objetivoNome" placeholder="Ex. Viagem, entrada do apartamento" required />
             <label>Tipo</label>
@@ -523,7 +523,7 @@
             <button id="botaoObjetivo" type="submit">Salvar objetivo</button>
             <button id="cancelarObjetivo" type="button" class="secondary hidden" onclick="cancelarEdicaoObjetivo()">Cancelar edição</button>
           </form>
-          <div class="chart"><div class="section-heading"><div><span class="eyebrow">Progresso</span><h2>Meus objetivos</h2></div><span id="resumoObjetivos" class="soft-pill">Nenhum criado</span></div><div id="listaObjetivos"></div></div>
+          <div class="chart"><div class="section-heading"><div><span class="eyebrow">Progresso</span><h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3v18" stroke-linecap="round"/><path d="M6 4.5h11l-2.5 3.5L17 11.5H6" stroke-linejoin="round"/></svg>Meus objetivos</h2></div><span id="resumoObjetivos" class="soft-pill">Nenhum criado</span></div><div id="listaObjetivos"></div></div>
         </div>
       </div>
     </section>
@@ -556,6 +556,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=27"></script>
+  <script src="script.js?v=28"></script>
 </body>
 </html>

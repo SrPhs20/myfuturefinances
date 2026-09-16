@@ -151,8 +151,8 @@ appContainer.insertAdjacentHTML("afterbegin", `
     </div>
 
     <div class="profile-actions">
-      <button class="secondary small-button" onclick="abrirPerfil()">Editar perfil</button>
-      <button class="secondary small-button" onclick="sair()">Sair</button>
+      <button class="secondary small-button" onclick="abrirPerfil()"><svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20.5c0-4 3.5-6.5 8-6.5s8 2.5 8 6.5" stroke-linecap="round"/><circle cx="12" cy="8" r="4"/></svg>Editar perfil</button>
+      <button class="secondary small-button" onclick="sair()"><svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 4.5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3" stroke-linecap="round"/><path d="M15 16l4-4-4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 12H9" stroke-linecap="round"/></svg>Sair</button>
     </div>
   </div>
 
@@ -178,8 +178,13 @@ appContainer.insertAdjacentHTML("afterbegin", `
       </div>
 
       <div class="profile-pin-settings">
-        <span class="eyebrow">Avisos</span>
-        <h3>Notificações de vencimento</h3>
+        <div class="profile-security-head">
+          <span class="profile-notif-bell" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 10.5a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 14.5 6 10.5z" stroke-linejoin="round"/><path d="M10 19a2.2 2.2 0 0 0 4 0" stroke-linecap="round"/></svg></span>
+          <div>
+            <span class="eyebrow">Avisos</span>
+            <h3>Notificações de vencimento</h3>
+          </div>
+        </div>
         <p>Receba um aviso quando uma conta fixa ou a fatura de um cartão estiver perto de vencer — funciona mesmo com o app fechado.</p>
         <button type="button" id="botaoAtivarNotificacoes" onclick="ativarNotificacoes()">Ativar notificações</button>
         <button type="button" class="secondary hidden" id="botaoDesativarNotificacoes" onclick="desativarNotificacoes()">Desativar notificações</button>
