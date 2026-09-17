@@ -341,6 +341,11 @@ tbody tr:hover {
   color: #b91c1c;
 }
 
+.status-card {
+  background: #f3ecf9;
+  color: #6b3fa0;
+}
+
 /* Calendário bonito */
 .flatpickr-calendar {
   border-radius: 18px;

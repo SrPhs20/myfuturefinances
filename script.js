@@ -1610,6 +1610,17 @@ function atualizarContasFixas() {
 
   const hoje = hojeTexto();
   const mesAtual = hoje.slice(0, 7);
+  const usoPorCartao = calcularUsoCartoes();
+
+  /* Uma conta vinculada a cartão, ao vencer, não fica "vencida": o valor
+     dela passa a ser cobrado do limite do cartão (ver calcularUsoCartoes) e
+     ela só volta a contar como vencida de verdade se o cartão não tiver
+     limite disponível pra cobrir — aí sim ela não foi paga por nenhum lado. */
+  function contaEstaVencida(conta) {
+    if (conta.vencimento >= hoje) return false;
+    if (!conta.cartao_id) return true;
+    return !!usoPorCartao.get(Number(conta.cartao_id))?.estourado;
+  }
 
   /* "Em aberto" é só o que ainda pesa neste mês: contas com vencimento até
      o fim do mês atual e que ainda não foram pagas. Uma conta que já foi
@@ -1621,7 +1632,7 @@ function atualizarContasFixas() {
       totalAbertas += Number(conta.valor);
       qtdAbertas++;
     }
-    if (conta.vencimento < hoje) {
+    if (contaEstaVencida(conta)) {
       totalVencidas += Number(conta.valor);
       qtdVencidas++;
     }
@@ -1633,31 +1644,34 @@ function atualizarContasFixas() {
     listaContas.innerHTML = '<p class="empty-state">Nenhuma conta encontrada neste grupo.</p>';
   }
 
+  /* Status de cada conta: as sem cartão seguem só a data (vencida / vence
+     hoje / em aberto). As vinculadas a cartão têm um terceiro estado, "No
+     cartão", a partir do dia do vencimento — o valor já foi absorvido pela
+     fatura atual do cartão, então não está mais em aberto nem vencida; só
+     volta a ser "Vencida" se o cartão não tiver limite pra cobrir. */
+  function statusDaConta(conta) {
+    if (conta.cartao_id) {
+      if (conta.vencimento > hoje) return { status: "Em aberto", classeStatus: "status-open", prioridade: 2 };
+      if (usoPorCartao.get(Number(conta.cartao_id))?.estourado) {
+        return { status: "Vencida", classeStatus: "status-late", prioridade: 0 };
+      }
+      return { status: "No cartão", classeStatus: "status-card", prioridade: 1 };
+    }
+
+    if (conta.vencimento < hoje) return { status: "Vencida", classeStatus: "status-late", prioridade: 0 };
+    if (conta.vencimento === hoje) return { status: "Vence hoje", classeStatus: "status-today", prioridade: 1 };
+    return { status: "Em aberto", classeStatus: "status-open", prioridade: 2 };
+  }
+
   const contasOrdenadas = [...contasFiltradas]
-    .map(conta => {
-      let prioridade = 2;
-
-      if (conta.vencimento < hoje) prioridade = 0;
-      if (conta.vencimento === hoje) prioridade = 1;
-
-      return { ...conta, prioridade };
-    })
+    .map(conta => ({ ...conta, ...statusDaConta(conta) }))
     .sort((a, b) => {
       if (a.prioridade !== b.prioridade) return a.prioridade - b.prioridade;
       return new Date(a.vencimento) - new Date(b.vencimento);
     });
 
   contasOrdenadas.forEach(conta => {
-    let status = "Em aberto";
-    let classeStatus = "status-open";
-
-    if (conta.vencimento < hoje) {
-      status = "Vencida";
-      classeStatus = "status-late";
-    } else if (conta.vencimento === hoje) {
-      status = "Vence hoje";
-      classeStatus = "status-today";
-    }
+    const { status, classeStatus } = conta;
 
     const grupo = gruposContas.find(item => Number(item.id) === Number(conta.grupo_id));
     const corGrupo = grupo ? corParaGrupo(grupo.nome) : null;
@@ -3422,6 +3436,48 @@ async function removerCartaoRegistrado(id) {
   atualizarTudo();
 }
 
+/* Uso do limite de cada cartão, compartilhado entre a aba Cartões e a aba
+   Contas Fixas: uma conta fixa vinculada só ocupa limite quando chega na
+   data de vencimento (entra na fatura atual); ao marcar como paga, o
+   vencimento rola pro mês seguinte e ela sai da fatura sozinha, devolvendo
+   o limite. "estourado" marca quando a fatura atual passou do limite do
+   cartão — é o único caso em que uma conta vinculada ao cartão deve
+   continuar aparecendo como "Vencida" (não teve limite para cobrir). */
+function calcularUsoCartoes() {
+  const hoje = hojeTexto();
+  const mapa = new Map();
+
+  cartoes.forEach(cartao => {
+    const contasVinculadas = contasFixas.filter(conta => Number(conta.cartao_id) === Number(cartao.id));
+    const totalMensal = contasVinculadas.reduce((total, conta) => total + Number(conta.valor), 0);
+
+    const contasNaFaturaAtual = contasVinculadas.filter(conta => conta.vencimento <= hoje);
+    const totalContasNaFaturaAtual = contasNaFaturaAtual.reduce((total, conta) => total + Number(conta.valor), 0);
+
+    const parcelasVinculadas = cartoesParcelados.filter(item => Number(item.cartao_id) === Number(cartao.id) && Number(item.parcelas_pagas) < Number(item.total_parcelas));
+    const totalParcelasAberto = parcelasVinculadas.reduce((total, item) => {
+      const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
+      const restantes = Number(item.total_parcelas) - Number(item.parcelas_pagas);
+      return total + valorParcela * restantes;
+    }, 0);
+
+    const usoTotal = totalParcelasAberto + totalContasNaFaturaAtual;
+    const temLimite = cartao.limite !== null && cartao.limite !== undefined && cartao.limite !== "";
+    const limite = temLimite ? Number(cartao.limite) : null;
+    const disponivel = limite !== null ? Math.max(limite - usoTotal, 0) : null;
+    const percentualUso = limite ? Math.min((usoTotal / limite) * 100, 100) : 0;
+    const estourado = temLimite && usoTotal > limite;
+
+    mapa.set(Number(cartao.id), {
+      contasVinculadas, totalMensal, contasNaFaturaAtual, totalContasNaFaturaAtual,
+      parcelasVinculadas, totalParcelasAberto, usoTotal, temLimite, limite,
+      disponivel, percentualUso, estourado
+    });
+  });
+
+  return mapa;
+}
+
 function atualizarCartoesRegistrados() {
   const lista = document.getElementById("listaCartoesRegistrados");
   if (!lista) return;
@@ -3434,33 +3490,15 @@ function atualizarCartoesRegistrados() {
     return;
   }
 
-  const hoje = hojeTexto();
+  const usoPorCartao = calcularUsoCartoes();
 
   lista.innerHTML = cartoes.map(cartao => {
-    const contasVinculadas = contasFixas.filter(conta => Number(conta.cartao_id) === Number(cartao.id));
-    const totalMensal = contasVinculadas.reduce((total, conta) => total + Number(conta.valor), 0);
+    const {
+      contasVinculadas, totalMensal, contasNaFaturaAtual, totalContasNaFaturaAtual,
+      parcelasVinculadas, usoTotal, temLimite, limite, disponivel, percentualUso
+    } = usoPorCartao.get(Number(cartao.id));
 
-    /* Uma conta fixa vinculada ao cartão só ocupa limite quando ela chega
-       na data de vencimento (entra na fatura atual) — enquanto ainda não
-       venceu, ela não desconta nada do limite disponível. Ao marcar como
-       paga, o vencimento rola pro mês seguinte e ela sai da fatura atual
-       automaticamente, devolvendo o limite. */
-    const contasNaFaturaAtual = contasVinculadas.filter(conta => conta.vencimento <= hoje);
-    const totalContasNaFaturaAtual = contasNaFaturaAtual.reduce((total, conta) => total + Number(conta.valor), 0);
-
-    const parcelasVinculadas = cartoesParcelados.filter(item => Number(item.cartao_id) === Number(cartao.id) && Number(item.parcelas_pagas) < Number(item.total_parcelas));
-    const totalParcelasAberto = parcelasVinculadas.reduce((total, item) => {
-      const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
-      const restantes = Number(item.total_parcelas) - Number(item.parcelas_pagas);
-      return total + valorParcela * restantes;
-    }, 0);
-
-    const usoTotal = totalParcelasAberto + totalContasNaFaturaAtual;
     const banco = estiloCartaoBanco(cartao.nome);
-    const temLimite = cartao.limite !== null && cartao.limite !== undefined && cartao.limite !== "";
-    const limite = temLimite ? Number(cartao.limite) : null;
-    const disponivel = limite !== null ? Math.max(limite - usoTotal, 0) : null;
-    const percentualUso = limite ? Math.min((usoTotal / limite) * 100, 100) : 0;
 
     const detalheContas = contasVinculadas.length
       ? `${contasVinculadas.length} conta${contasVinculadas.length === 1 ? "" : "s"} fixa${contasVinculadas.length === 1 ? "" : "s"} (${formatarMoeda(totalMensal)}/mês${contasNaFaturaAtual.length ? `, ${formatarMoeda(totalContasNaFaturaAtual)} na fatura atual` : ", nenhuma na fatura atual"})`
@@ -3540,16 +3578,22 @@ function atualizarDetalheCartaoSelecionado() {
   const hoje = hojeTexto();
   const contasDoCartao = contasFixas.filter(conta => Number(conta.cartao_id) === Number(cartao.id));
   const parcelasDoCartao = cartoesParcelados.filter(item => Number(item.cartao_id) === Number(cartao.id));
+  const usoCartaoSelecionado = calcularUsoCartoes().get(Number(cartao.id));
 
   const linhasContas = contasDoCartao.map(conta => {
+    /* Mesma regra da aba Contas Fixas: uma vez vencida, a conta é cobrada
+       do limite do cartão e deixa de estar "em aberto" ou "vencida" — só
+       volta a ser "Vencida" se o cartão não tiver limite pra cobrir. */
     let status = "Em aberto";
     let classeStatus = "status-open";
-    if (conta.vencimento < hoje) {
-      status = "Vencida";
-      classeStatus = "status-late";
-    } else if (conta.vencimento === hoje) {
-      status = "Vence hoje";
-      classeStatus = "status-today";
+    if (conta.vencimento <= hoje) {
+      if (usoCartaoSelecionado?.estourado) {
+        status = "Vencida";
+        classeStatus = "status-late";
+      } else {
+        status = "No cartão";
+        classeStatus = "status-card";
+      }
     }
 
     return `
