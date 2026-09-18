@@ -270,7 +270,7 @@ document.getElementById("listaContasAdmin").addEventListener("click", async even
 
   botao.disabled = true;
   try {
-    await chamarAdminContas({ action: "excluir", public_id: publicId });
+    await chamarAdminExcluir(publicId);
     mfToast(`Conta de ${nome} excluída.`, "sucesso");
     await carregarContasAdmin();
   } catch (error) {
@@ -803,12 +803,19 @@ async function chamarAcessoPerfis(body) {
 
 /* Painel admin: lista todas as contas com saldo e permite excluir a de
    outra pessoa, direto pelo app (só funciona pra quem tem is_admin = true —
-   a checagem de verdade acontece no servidor, na Edge Function). */
-async function chamarAdminContas(body) {
-  const { data, error } = await supabaseClient.functions.invoke("smooth-handler", { body });
+   a checagem de verdade acontece no banco, dentro das próprias funções
+   admin_listar_contas/admin_excluir_conta — ver migração
+   20260918130000_admin_via_rpc.sql). Isso substitui a Edge Function
+   antiga: sem deploy manual, sem CORS pra configurar. */
+async function chamarAdminListar() {
+  const { data, error } = await supabaseClient.rpc("admin_listar_contas");
   if (error) throw error;
-  if (!data?.ok) throw new Error(data?.mensagem || "Não foi possível concluir esta operação.");
-  return data;
+  return data || [];
+}
+
+async function chamarAdminExcluir(publicId) {
+  const { error } = await supabaseClient.rpc("admin_excluir_conta", { p_public_id: publicId });
+  if (error) throw error;
 }
 
 function contaAdminHTML(conta) {
@@ -842,8 +849,7 @@ async function carregarContasAdmin() {
   if (!lista) return;
   lista.innerHTML = '<p class="empty-state">Carregando contas…</p>';
   try {
-    const resposta = await chamarAdminContas({ action: "listar" });
-    const contas = resposta.contas || [];
+    const contas = await chamarAdminListar();
     lista.innerHTML = contas.length
       ? contas.map(contaAdminHTML).join("")
       : '<p class="empty-state">Nenhuma conta encontrada.</p>';
