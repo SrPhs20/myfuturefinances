@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-future-finances-v34";
+const CACHE_NAME = "my-future-finances-v35";
 const APP_SHELL = ["/", "/index.html", "/style.css?v=32", "/script.js?v=31", "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", event => {
