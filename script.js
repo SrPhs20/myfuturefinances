@@ -2,7 +2,7 @@ const SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYWZ5bHpucHJpYm1wdW1jZ3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzA1NzcsImV4cCI6MjA5NjcwNjU3N30.a1Tg7EAsusekhQ3gdUopSE4b0MDSbP-YQEiv3khQeI4";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const COLUNAS_PERFIL = "id,user_id,public_id,nome,avatar_url,created_at,updated_at,pin_length,notificar_vencimentos,notificar_antecedencia_dias";
+const COLUNAS_PERFIL = "id,user_id,public_id,nome,avatar_url,created_at,updated_at,pin_length,notificar_vencimentos,notificar_antecedencia_dias,is_admin";
 const VAPID_PUBLIC_KEY = "BBWpHWUBmp2CI8AErgUC8kYrc9ev7SUC0iBfu3S_--XinwgfGeqEeUpx9mn-XNQPHH02OqdTOXgmtpoqRanBQiE";
 const CONTAS_DISPOSITIVO_KEY = "myfuturefinances:contas:v1";
 
@@ -162,6 +162,11 @@ appContainer.insertAdjacentHTML("afterbegin", `
 
       <h2>Meu perfil</h2>
 
+      <button type="button" id="botaoPainelAdmin" class="secondary small-button hidden admin-panel-entrada" onclick="abrirPainelAdmin()">
+        <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="14" rx="2.5"/><path d="M3.5 9h17" stroke-linecap="round"/><circle cx="8" cy="13.5" r="1.3"/></svg>
+        Painel admin — todas as contas
+      </button>
+
       <div class="profile-photo-picker">
         <button type="button" class="profile-photo-button" onclick="document.getElementById('perfilFoto').click()" aria-label="Trocar foto de perfil">
           <img id="previewPerfil" class="profile-avatar-large hidden" />
@@ -217,6 +222,17 @@ appContainer.insertAdjacentHTML("afterbegin", `
       <button class="danger" onclick="excluirPerfil()">Excluir perfil e dados</button>
     </div>
   </div>
+
+  <div id="modalAdmin" class="profile-modal hidden">
+    <div class="profile-card">
+      <button type="button" class="profile-modal-close" onclick="fecharPainelAdmin()" aria-label="Fechar">&times;</button>
+
+      <h2>Painel admin</h2>
+      <p class="admin-panel-sub">Todas as contas criadas no app, com o saldo de cada uma. Excluir aqui apaga a conta e todos os dados financeiros da pessoa — sem volta.</p>
+
+      <div id="listaContasAdmin"></div>
+    </div>
+  </div>
 `);
 
 document.getElementById("perfilFoto").addEventListener("change", () => {
@@ -235,6 +251,32 @@ document.getElementById("perfilFoto").addEventListener("change", () => {
     vazio.classList.add("hidden");
   };
   leitor.readAsDataURL(arquivo);
+});
+
+document.getElementById("listaContasAdmin").addEventListener("click", async event => {
+  const botao = event.target.closest(".admin-excluir-conta");
+  if (!botao) return;
+
+  const linha = botao.closest("[data-public-id]");
+  const publicId = linha?.dataset.publicId;
+  const nome = linha?.dataset.nome || "essa pessoa";
+  if (!publicId) return;
+
+  const confirmar = await mfConfirm(
+    `Essa ação apaga a conta de ${nome} e todos os dados financeiros dela — não tem volta.`,
+    { titulo: `Excluir a conta de ${nome}?` }
+  );
+  if (!confirmar) return;
+
+  botao.disabled = true;
+  try {
+    await chamarAdminContas({ action: "excluir", public_id: publicId });
+    mfToast(`Conta de ${nome} excluída.`, "sucesso");
+    await carregarContasAdmin();
+  } catch (error) {
+    mfToast(mensagemErro(error, "Não foi possível excluir esta conta."), "erro");
+    botao.disabled = false;
+  }
 });
 
 const authScreen = document.getElementById("authScreen");
@@ -757,6 +799,66 @@ async function chamarAcessoPerfis(body) {
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.mensagem || "Não foi possível concluir esta operação.");
   return data;
+}
+
+/* Painel admin: lista todas as contas com saldo e permite excluir a de
+   outra pessoa, direto pelo app (só funciona pra quem tem is_admin = true —
+   a checagem de verdade acontece no servidor, na Edge Function). */
+async function chamarAdminContas(body) {
+  const { data, error } = await supabaseClient.functions.invoke("admin-contas", { body });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.mensagem || "Não foi possível concluir esta operação.");
+  return data;
+}
+
+function contaAdminHTML(conta) {
+  const nome = escaparHTML(conta.nome || "Sem nome");
+  const avatar = conta.avatar_url
+    ? `<img src="${escaparHTML(conta.avatar_url)}" alt="" />`
+    : `<span>${escaparHTML(iniciaisDoPerfil(conta.nome))}</span>`;
+  const criadaEm = conta.created_at ? formatarData(String(conta.created_at).slice(0, 10)) : "—";
+  const ehVoce = perfilAtual && conta.public_id === perfilAtual.public_id;
+
+  return `
+    <div class="fixed-bill admin-conta-linha" data-public-id="${escaparHTML(conta.public_id)}" data-nome="${nome}">
+      <div class="admin-conta-info">
+        <span class="admin-conta-avatar">${avatar}</span>
+        <div>
+          <strong>${nome}</strong>
+          <p>Saldo: ${formatarMoeda(conta.saldo)} • Criada em ${criadaEm}</p>
+          <div class="bill-tags">
+            <span class="group-badge ${conta.show_on_home ? "" : "group-badge-empty"}">${conta.show_on_home ? "Visível pra todos" : "Só neste aparelho"}</span>
+          </div>
+        </div>
+      </div>
+      <div class="bill-actions">
+        ${ehVoce ? `<span class="admin-conta-voce">Essa é a sua conta</span>` : `<button type="button" class="danger admin-excluir-conta">Excluir</button>`}
+      </div>
+    </div>`;
+}
+
+async function carregarContasAdmin() {
+  const lista = document.getElementById("listaContasAdmin");
+  if (!lista) return;
+  lista.innerHTML = '<p class="empty-state">Carregando contas…</p>';
+  try {
+    const resposta = await chamarAdminContas({ action: "listar" });
+    const contas = resposta.contas || [];
+    lista.innerHTML = contas.length
+      ? contas.map(contaAdminHTML).join("")
+      : '<p class="empty-state">Nenhuma conta encontrada.</p>';
+  } catch (error) {
+    lista.innerHTML = `<p class="empty-state">${escaparHTML(mensagemErro(error, "Não foi possível carregar as contas."))}</p>`;
+  }
+}
+
+function abrirPainelAdmin() {
+  document.getElementById("modalAdmin").classList.remove("hidden");
+  carregarContasAdmin();
+}
+
+function fecharPainelAdmin() {
+  document.getElementById("modalAdmin").classList.add("hidden");
 }
 
 function cardContaHTML(conta) {
@@ -2683,6 +2785,7 @@ async function carregarPerfil() {
 
 function abrirPerfil() {
   document.getElementById("modalPerfil").classList.remove("hidden");
+  document.getElementById("botaoPainelAdmin").classList.toggle("hidden", !perfilAtual?.is_admin);
 
   const partesNome = String(perfilAtual?.nome || "").trim().split(/\s+/).filter(Boolean);
   document.getElementById("perfilNome").value = partesNome[0] || "";

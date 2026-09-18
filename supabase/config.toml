@@ -27,3 +27,6 @@ verify_jwt = true
 
 [functions.profile-access]
 verify_jwt = false
+
+[functions.admin-contas]
+verify_jwt = true

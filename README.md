@@ -10,6 +10,7 @@ O dashboard funciona como um orientador: calcula um placar de saúde financeira,
 - `supabase/migrations`: banco, índices, RLS, gatilhos e funções transacionais.
 - `supabase/functions/delete-account`: exclusão definitiva da conta no Supabase Auth.
 - `supabase/functions/profile-access`: criação e entrada por perfil sem expor email ou senha técnica na interface.
+- `supabase/functions/admin-contas`: painel admin dentro do app — lista todas as contas com saldo e exclui a de outra pessoa. Só funciona pra quem tem `perfis.is_admin = true`.
 - `vercel.json`: publicação e cabeçalhos de segurança no Vercel.
 - `manifest.json` e `service-worker.js`: instalação como PWA e shell offline.
 
@@ -17,7 +18,7 @@ O dashboard funciona como um orientador: calcula um placar de saúde financeira,
 
 1. Abra o SQL Editor do projeto `hjafylznpribmpumcgtk`.
 2. Aplique todas as migrações de `supabase/migrations` na ordem dos nomes dos arquivos.
-3. Publique `delete-account` com JWT habilitado e `profile-access` sem verificação de JWT; esta última valida o PIN no servidor.
+3. Publique `delete-account` e `admin-contas` com JWT habilitado, e `profile-access` sem verificação de JWT; esta última valida o PIN no servidor.
 4. Em Authentication > URL Configuration, cadastre a URL de produção e as URLs locais permitidas.
 
 A chave usada no navegador é a chave pública `anon`. Nunca coloque `service_role` no frontend.
