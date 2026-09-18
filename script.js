@@ -805,7 +805,7 @@ async function chamarAcessoPerfis(body) {
    outra pessoa, direto pelo app (só funciona pra quem tem is_admin = true —
    a checagem de verdade acontece no servidor, na Edge Function). */
 async function chamarAdminContas(body) {
-  const { data, error } = await supabaseClient.functions.invoke("admin-contas", { body });
+  const { data, error } = await supabaseClient.functions.invoke("smooth-handler", { body });
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.mensagem || "Não foi possível concluir esta operação.");
   return data;
