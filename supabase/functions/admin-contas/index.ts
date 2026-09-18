@@ -37,18 +37,18 @@ Deno.serve(async request => {
   const token = autorizacao.replace(/^Bearer\s+/i, "");
   if (!token) return json({ ok: false, mensagem: "Sessao invalida." }, 401);
 
-  const { data: chamador, error: erroChamador } = await admin.auth.getUser(token);
-  if (erroChamador || !chamador?.user) return json({ ok: false, mensagem: "Sessao invalida." }, 401);
-
-  const { data: perfilChamador, error: erroPerfilChamador } = await admin
-    .from("perfis")
-    .select("is_admin")
-    .eq("user_id", chamador.user.id)
-    .maybeSingle();
-  if (erroPerfilChamador) throw erroPerfilChamador;
-  if (!perfilChamador?.is_admin) return json({ ok: false, mensagem: "Sem permissao para isso." }, 403);
-
   try {
+    const { data: chamador, error: erroChamador } = await admin.auth.getUser(token);
+    if (erroChamador || !chamador?.user) return json({ ok: false, mensagem: "Sessao invalida." }, 401);
+
+    const { data: perfilChamador, error: erroPerfilChamador } = await admin
+      .from("perfis")
+      .select("is_admin")
+      .eq("user_id", chamador.user.id)
+      .maybeSingle();
+    if (erroPerfilChamador) throw erroPerfilChamador;
+    if (!perfilChamador?.is_admin) return json({ ok: false, mensagem: "Sem permissao para isso." }, 403);
+
     const body = await request.json();
     const action = body?.action;
 
