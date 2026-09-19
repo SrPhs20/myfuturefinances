@@ -1540,11 +1540,12 @@ function atualizarTela() {
 
   filtrados.forEach(item => {
     const tr = document.createElement("tr");
+    const corCategoria = corParaCategoria(item.categoria);
 
     tr.innerHTML = `
       <td>${formatarData(item.data)}</td>
       <td>${item.tipo === "receita" ? "Receita" : "Despesa"}</td>
-      <td>${escaparHTML(item.categoria)}</td>
+      <td><span class="categoria-pill" style="--cor-bg:${corCategoria.bg};--cor-fg:${corCategoria.fg}">${escaparHTML(item.categoria)}</span></td>
       <td>${escaparHTML(item.descricao)}</td>
       <td class="${item.tipo === "receita" ? "positive" : "negative"}">
         ${formatarMoeda(item.valor)}
@@ -2068,16 +2069,20 @@ function atualizarListaGerenciarCategorias() {
     return;
   }
 
-  lista.innerHTML = itensOrdenados.map(item => modoEdicaoCategorias ? `
-      <span class="categoria-chip categoria-chip-editando">
+  lista.innerHTML = itensOrdenados.map(item => {
+    const cor = corParaCategoria(item.nome);
+    const estilo = `--cor-bg:${cor.bg};--cor-fg:${cor.fg}`;
+    return modoEdicaoCategorias ? `
+      <span class="categoria-chip categoria-chip-editando" style="${estilo}">
         <input type="text" class="categoria-chip-input" maxlength="40" data-id="${item.id}" data-nome-original="${escaparHTML(item.nome)}" value="${escaparHTML(item.nome)}" />
         <button type="button" class="categoria-chip-delete" onclick="excluirCategoria(${item.id})" aria-label="Excluir categoria ${escaparHTML(item.nome)}">×</button>
       </span>
     ` : `
-      <span class="categoria-chip">
+      <span class="categoria-chip" style="${estilo}">
         <button type="button" class="categoria-chip-label" data-nome="${escaparHTML(item.nome)}">${escaparHTML(item.nome)}</button>
       </span>
-    `).join("");
+    `;
+  }).join("");
 }
 
 document.getElementById("listaCategoriasGerenciar")?.addEventListener("click", event => {
@@ -2621,16 +2626,17 @@ function atualizarGrafico() {
   Object.keys(categorias).forEach(categoria => {
     const valor = categorias[categoria];
     const largura = maior > 0 ? (valor / maior) * 100 : 0;
+    const cor = corParaCategoria(categoria);
 
     const div = document.createElement("div");
     div.className = "bar";
 
     div.innerHTML = `
       <div class="bar-label">
-        <span>${escaparHTML(categoria)}</span>
+        <span><span class="categoria-dot" style="background:${cor.dot}"></span>${escaparHTML(categoria)}</span>
         <span>${formatarMoeda(valor)}</span>
       </div>
-      <div class="bar-fill" style="width:${largura}%"></div>
+      <div class="bar-fill" style="width:${largura}%;background:linear-gradient(90deg, ${cor.dot}, ${cor.fg})"></div>
     `;
 
     grafico.appendChild(div);
@@ -4034,7 +4040,8 @@ function atualizarPlanejamento() {
     const percentual = limite > 0 ? gasto / limite * 100 : 0;
     totalLimites += limite; totalGasto += gasto;
     const classe = percentual > 100 ? "budget-danger" : percentual >= 80 ? "budget-warning" : "budget-ok";
-    return `<div class="budget-item"><div class="bar-label"><strong>${escaparHTML(item.categoria)}</strong><span>${formatarMoeda(gasto)} de ${formatarMoeda(limite)}</span></div><div class="budget-track"><span class="${classe}" style="width:${Math.min(percentual, 100)}%"></span></div><div class="budget-footer"><small>${Math.round(percentual)}% utilizado</small><div><button class="link-button" onclick="editarOrcamento(${item.id})">Editar</button><button class="link-button danger-text" onclick="removerOrcamento(${item.id})">Excluir</button></div></div></div>`;
+    const corCategoria = corParaCategoria(item.categoria);
+    return `<div class="budget-item"><div class="bar-label"><strong><span class="categoria-dot" style="background:${corCategoria.dot}"></span>${escaparHTML(item.categoria)}</strong><span>${formatarMoeda(gasto)} de ${formatarMoeda(limite)}</span></div><div class="budget-track"><span class="${classe}" style="width:${Math.min(percentual, 100)}%"></span></div><div class="budget-footer"><small>${Math.round(percentual)}% utilizado</small><div><button class="link-button" onclick="editarOrcamento(${item.id})">Editar</button><button class="link-button danger-text" onclick="removerOrcamento(${item.id})">Excluir</button></div></div></div>`;
   }).join("") : '<p class="empty-state">Crie seu primeiro limite para o mês selecionado.</p>';
   document.getElementById("saldoOrcamentos").textContent = formatarMoeda(totalLimites - totalGasto);
   document.getElementById("resumoOrcamentos").textContent = orcamentosMes.length ? `${orcamentosMes.length} categoria(s)` : "Nenhum criado";

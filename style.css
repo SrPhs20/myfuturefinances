@@ -1355,7 +1355,7 @@ tbody tr:hover { background: #f4f8f3; }
   gap: 2px;
   padding: 3px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--cor-bg, #fff);
   border: 1px solid var(--line);
 }
 .categoria-chip-label {
@@ -1367,9 +1367,31 @@ tbody tr:hover { background: #f4f8f3; }
   border-radius: 999px;
   font-size: .8rem;
   font-weight: 650;
-  color: var(--forest-900);
+  color: var(--cor-fg, var(--forest-900));
   background: transparent;
   box-shadow: none;
+}
+/* Pastilha de cor por categoria, usada na tabela de lançamentos. */
+.categoria-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full, 999px);
+  font-size: .78rem;
+  font-weight: 650;
+  white-space: nowrap;
+  background: var(--cor-bg, var(--mint-100));
+  color: var(--cor-fg, var(--forest-900));
+}
+/* Bolinha de cor por categoria, usada no gráfico e nos orçamentos. */
+.categoria-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 .categoria-chip-label:hover { color: #fff; background: linear-gradient(135deg, var(--emerald-600), var(--forest-800)); box-shadow: none; transform: none; }
 
