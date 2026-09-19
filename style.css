@@ -2,6 +2,49 @@
   box-sizing: border-box;
 }
 
+/* Identidade visual financeira — tokens no topo do arquivo para servirem de
+   base a todo o resto do CSS. Cores originais preservadas (mesmos nomes e
+   valores); adicionadas escalas de espaçamento e raio para consolidar os
+   valores soltos usados pelo app. */
+:root {
+  --forest-950: #0b2b1e;
+  --forest-900: #123d2b;
+  --forest-800: #17513a;
+  --emerald-700: #1d704c;
+  --emerald-600: #23845a;
+  --emerald-500: #31a46f;
+  --mint-200: #bfe3cb;
+  --mint-100: #dcefe2;
+  --mint-50: #eff8f1;
+  --ivory: #fffdf7;
+  --paper: #f8f6ef;
+  --gold: #c99b43;
+  --ink: #173126;
+  --muted: #68786f;
+  --line: #dbe5dd;
+  --danger: #b7473d;
+  --shadow: 0 14px 36px rgba(24, 65, 45, .09);
+
+  /* Escala de espaçamento (base 4px) — usar em novos componentes; o CSS
+     existente continua com valores soltos até ser migrado aos poucos. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Escala de raio — consolida os valores hoje espalhados (5px–26px, 999px,
+     50%) em passos previsíveis para uso em novos componentes. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+}
+
 body {
   font-family: Arial, sans-serif;
   background:
@@ -867,27 +910,6 @@ span.flatpickr-weekday {
 }
 @media (max-width: 420px) {
   .patrimonio-metrics { grid-template-columns:1fr; }
-}
-
-/* Identidade visual financeira */
-:root {
-  --forest-950: #0b2b1e;
-  --forest-900: #123d2b;
-  --forest-800: #17513a;
-  --emerald-700: #1d704c;
-  --emerald-600: #23845a;
-  --emerald-500: #31a46f;
-  --mint-200: #bfe3cb;
-  --mint-100: #dcefe2;
-  --mint-50: #eff8f1;
-  --ivory: #fffdf7;
-  --paper: #f8f6ef;
-  --gold: #c99b43;
-  --ink: #173126;
-  --muted: #68786f;
-  --line: #dbe5dd;
-  --danger: #b7473d;
-  --shadow: 0 14px 36px rgba(24, 65, 45, .09);
 }
 
 body {

@@ -500,6 +500,49 @@ function corParaGrupo(nome) {
   return MF_PALETA_GRUPOS[hash % MF_PALETA_GRUPOS.length];
 }
 
+/* Cores estáveis por categoria de lançamento — mesma ideia de corParaGrupo
+   (hash determinístico + mapeamento privilegiado para as categorias padrão
+   do app), mas com paleta própria para não confundir visualmente com as
+   cores de grupos de contas fixas. Categorias personalizadas (tabela
+   "categorias") caem no hash, então sempre têm uma cor estável também. */
+const MF_PALETA_CATEGORIAS = [
+  { bg: "#fdece0", fg: "#9a4b12", dot: "#e8823a" }, // Alimentação
+  { bg: "#e6f2f7", fg: "#0e6377", dot: "#2ea8c2" }, // Moradia
+  { bg: "#eef1fb", fg: "#3949ab", dot: "#5c6bc0" }, // Transporte
+  { bg: "#fdeaea", fg: "#a63d35", dot: "#c96257" }, // Saúde
+  { bg: "#f3ecf9", fg: "#6b3fa0", dot: "#9b6fd1" }, // Educação
+  { bg: "#fdeef6", fg: "#a3346f", dot: "#d16aa0" }, // Lazer
+  { bg: "#eef6ea", fg: "#4d7c0f", dot: "#84b13a" }, // Assinaturas
+  { bg: "#e7f2ea", fg: "#1d704c", dot: "#31a46f" }, // Salário
+  { bg: "#eaf6f4", fg: "#0f766e", dot: "#14b8a6" }, // Investimentos
+  { bg: "#fdf1e0", fg: "#8a5a12", dot: "#c99b43" }, // Conta fixa
+  { bg: "#eef2f7", fg: "#33475b", dot: "#64748b" }, // Cartão de crédito
+  { bg: "#f4f4f2", fg: "#55605a", dot: "#8b968f" }  // Outros / personalizada
+];
+
+const MF_CATEGORIAS_COMUNS = {
+  "alimentação": 0, "alimentacao": 0,
+  "moradia": 1,
+  "transporte": 2,
+  "saúde": 3, "saude": 3,
+  "educação": 4, "educacao": 4,
+  "lazer": 5,
+  "assinaturas": 6,
+  "salário": 7, "salario": 7,
+  "investimentos": 8,
+  "conta fixa": 9,
+  "cartão de crédito": 10, "cartao de credito": 10,
+  "outros": 11
+};
+
+function corParaCategoria(nome) {
+  const chave = String(nome || "").trim().toLocaleLowerCase("pt-BR");
+  if (chave in MF_CATEGORIAS_COMUNS) return MF_PALETA_CATEGORIAS[MF_CATEGORIAS_COMUNS[chave]];
+  let hash = 0;
+  for (let i = 0; i < chave.length; i++) hash = (hash * 31 + chave.charCodeAt(i)) >>> 0;
+  return MF_PALETA_CATEGORIAS[hash % MF_PALETA_CATEGORIAS.length];
+}
+
 /* Identidade visual dos cartões: cores inspiradas na marca de cada banco (sem
    usar logos reais) para o cartão cadastrado parecer com o cartão de verdade
    na galeria da aba Cartões. Se o nome não bater com nenhum banco conhecido,
