@@ -1,9 +1,9 @@
-const SUPABASE_URL = "https://hjafylznpribmpumcgtk.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqYWZ5bHpucHJpYm1wdW1jZ3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzA1NzcsImV4cCI6MjA5NjcwNjU3N30.a1Tg7EAsusekhQ3gdUopSE4b0MDSbP-YQEiv3khQeI4";
+const SUPABASE_URL = "https://ijqobwweqvuqnftzxvdg.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqcW9id3dlcXZ1cW5mdHp4dmRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NzA5MzMsImV4cCI6MjEwNTM0NjkzM30.MyTqimTga9cp_Llt-sdrMnpLahpRdATfYOiWysbT9lI";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const COLUNAS_PERFIL = "id,user_id,public_id,nome,avatar_url,created_at,updated_at,pin_length,notificar_vencimentos,notificar_antecedencia_dias,is_admin";
-const VAPID_PUBLIC_KEY = "BBWpHWUBmp2CI8AErgUC8kYrc9ev7SUC0iBfu3S_--XinwgfGeqEeUpx9mn-XNQPHH02OqdTOXgmtpoqRanBQiE";
+const VAPID_PUBLIC_KEY = "BPxLMa2s5jD90r6PepxLMopcYFgmCBRw030uhu03T39FIj3NVq13ooO5t3a44KoC5vew7pSi7uNYq0cn3Pb3vG4";
 const CONTAS_DISPOSITIVO_KEY = "myfuturefinances:contas:v1";
 
 let usuarioAtual = null;
