@@ -118,6 +118,43 @@ Deno.serve(async request => {
       }
     }
 
+    if (action === "set-pin") {
+      // Configura o PIN de um perfil que já existe mas ainda não tem PIN
+      // (ex.: conta migrada de outro projeto Supabase, onde o PIN não pôde
+      // ser copiado por segurança). Só funciona uma vez: se o perfil já
+      // tiver um pin_hash configurado, recusa — evita que alguém troque o
+      // PIN de uma conta que não é dela.
+      if (!uuidValido(body.public_id) || !pinValido(body.pin)) {
+        return json({ ok: false, mensagem: "Conta ou PIN invalido." });
+      }
+
+      const { data: perfilAlvo, error: erroPerfilAlvo } = await admin
+        .from("perfis")
+        .select("user_id,pin_hash")
+        .eq("public_id", body.public_id)
+        .single();
+      if (erroPerfilAlvo || !perfilAlvo) return json({ ok: false, mensagem: "Conta nao encontrada." });
+      if (perfilAlvo.pin_hash) return json({ ok: false, mensagem: "Este perfil ja tem um PIN configurado." });
+
+      const { error: erroPin } = await admin.rpc("configurar_pin_conta_admin", {
+        p_user_id: perfilAlvo.user_id,
+        p_pin: body.pin,
+      });
+      if (erroPin) throw erroPin;
+
+      const { data: usuarioAlvo, error: erroUsuarioAlvo } = await admin.auth.admin.getUserById(perfilAlvo.user_id);
+      const emailAlvo = usuarioAlvo?.user?.email;
+      if (erroUsuarioAlvo || !emailAlvo) throw erroUsuarioAlvo || new Error("Conta nao encontrada.");
+
+      const { data: linkAlvo, error: erroLinkAlvo } = await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email: emailAlvo,
+      });
+      if (erroLinkAlvo || !linkAlvo?.properties?.hashed_token) throw erroLinkAlvo || new Error("Acesso nao gerado.");
+
+      return json({ ok: true, token_hash: linkAlvo.properties.hashed_token });
+    }
+
     if (action === "login") {
       if (!uuidValido(body.public_id) || !pinValido(body.pin)) {
         return json({ ok: false, valido: false, mensagem: "Conta ou PIN invalido." });

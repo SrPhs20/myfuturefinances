@@ -1194,6 +1194,35 @@ async function configurarPinInicial() {
   }
 
   mensagem.textContent = "Protegendo seu perfil…";
+
+  // Perfil sem sessão ainda (ex.: selecionado no seletor de contas, mas
+  // migrado de outro projeto e por isso ainda sem PIN): configurar_pin_acesso
+  // usa auth.uid() e por isso exige sessão já aberta. Nesse caso, pede pro
+  // servidor (profile-access, com service_role) configurar o PIN e devolver
+  // um link de acesso — só funciona se o perfil ainda não tiver PIN.
+  if (!usuarioAtual) {
+    let dadosAcesso;
+    try {
+      dadosAcesso = await chamarAcessoPerfis({ action: "set-pin", public_id: perfilAtual.public_id, pin });
+      const { data: autenticacao, error: erroAutenticacao } = await supabaseClient.auth.verifyOtp({
+        token_hash: dadosAcesso.token_hash,
+        type: "email"
+      });
+      if (erroAutenticacao || !autenticacao.user) throw erroAutenticacao || new Error("Não foi possível abrir a conta.");
+      usuarioAtual = autenticacao.user;
+    } catch (error) {
+      mensagem.textContent = mensagemErro(error, "Não foi possível criar o PIN.");
+      return;
+    }
+
+    perfilAtual.pin_length = pin.length;
+    document.getElementById("novoPinGate").value = "";
+    document.getElementById("confirmarPinGate").value = "";
+    lembrarConta(perfilAtual.public_id);
+    await iniciarApp({ bloquear: false });
+    return;
+  }
+
   const { data, error } = await supabaseClient.rpc("configurar_pin_acesso", { p_pin: pin });
   if (error) {
     mensagem.textContent = mensagemErro(error, "Não foi possível criar o PIN.");
