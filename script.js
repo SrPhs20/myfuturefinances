@@ -150,9 +150,30 @@ appContainer.insertAdjacentHTML("afterbegin", `
       </div>
     </div>
 
-    <div class="profile-actions">
-      <button class="secondary small-button" onclick="abrirPerfil()"><svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20.5c0-4 3.5-6.5 8-6.5s8 2.5 8 6.5" stroke-linecap="round"/><circle cx="12" cy="8" r="4"/></svg>Editar perfil</button>
-      <button class="secondary small-button" onclick="sair()"><svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 4.5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3" stroke-linecap="round"/><path d="M15 16l4-4-4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 12H9" stroke-linecap="round"/></svg>Sair</button>
+    <button type="button" class="menu-glass-trigger" id="botaoMenuGlass" onclick="abrirMenuGlass()" aria-haspopup="true" aria-expanded="false" aria-controls="menuGlassPanel" aria-label="Abrir menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <div id="menuGlassOverlay" class="menu-glass-overlay hidden" onclick="mfCliqueForaMenuGlass(event)">
+    <div id="menuGlassPanel" class="menu-glass-panel" role="menu" aria-label="Menu">
+      <div class="menu-glass-header">
+        <span>Menu</span>
+        <button type="button" class="menu-glass-close" onclick="fecharMenuGlass()" aria-label="Fechar menu">×</button>
+      </div>
+
+      <button type="button" class="menu-glass-item" role="menuitem" onclick="fecharMenuGlass(); abrirPerfil();">
+        <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20.5c0-4 3.5-6.5 8-6.5s8 2.5 8 6.5" stroke-linecap="round"/><circle cx="12" cy="8" r="4"/></svg>
+        Editar perfil
+      </button>
+      <button type="button" id="botaoPainelAdminMenu" class="menu-glass-item hidden admin-panel-entrada" role="menuitem" onclick="fecharMenuGlass(); abrirPainelAdmin();">
+        <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="14" rx="2.5"/><path d="M3.5 9h17" stroke-linecap="round"/><circle cx="8" cy="13.5" r="1.3"/></svg>
+        Painel admin — todas as contas
+      </button>
+      <button type="button" class="menu-glass-item menu-glass-item-danger" role="menuitem" onclick="fecharMenuGlass(); sair();">
+        <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 4.5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3" stroke-linecap="round"/><path d="M15 16l4-4-4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 12H9" stroke-linecap="round"/></svg>
+        Sair
+      </button>
     </div>
   </div>
 
@@ -2899,9 +2920,48 @@ async function carregarPerfil() {
   }
 }
 
+/* Mostra/esconde qualquer entrada de "Painel admin" (hoje: dentro do menu
+   liquid glass e dentro do modal de perfil) de acordo com is_admin — as duas
+   têm a classe admin-panel-entrada, então uma chamada só sincroniza ambas. */
+function atualizarVisibilidadeAdmin() {
+  document.querySelectorAll(".admin-panel-entrada").forEach(el => {
+    el.classList.toggle("hidden", !perfilAtual?.is_admin);
+  });
+}
+
+/* Menu "liquid glass": gaveta com vidro fosco que abre a partir do botão no
+   canto superior direito, igual no mobile e no desktop. Hospeda os atalhos
+   que antes ficavam como botões sempre visíveis na barra do usuário. */
+function abrirMenuGlass() {
+  const overlay = document.getElementById("menuGlassOverlay");
+  if (!overlay) return;
+  atualizarVisibilidadeAdmin();
+  overlay.classList.remove("hidden");
+  document.getElementById("botaoMenuGlass")?.setAttribute("aria-expanded", "true");
+  document.body.classList.add("menu-glass-aberto");
+}
+
+function fecharMenuGlass() {
+  const overlay = document.getElementById("menuGlassOverlay");
+  if (!overlay) return;
+  overlay.classList.add("hidden");
+  document.getElementById("botaoMenuGlass")?.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("menu-glass-aberto");
+}
+
+function mfCliqueForaMenuGlass(event) {
+  if (event.target.id === "menuGlassOverlay") fecharMenuGlass();
+}
+
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  const overlay = document.getElementById("menuGlassOverlay");
+  if (overlay && !overlay.classList.contains("hidden")) fecharMenuGlass();
+});
+
 function abrirPerfil() {
   document.getElementById("modalPerfil").classList.remove("hidden");
-  document.getElementById("botaoPainelAdmin").classList.toggle("hidden", !perfilAtual?.is_admin);
+  atualizarVisibilidadeAdmin();
 
   const partesNome = String(perfilAtual?.nome || "").trim().split(/\s+/).filter(Boolean);
   document.getElementById("perfilNome").value = partesNome[0] || "";
@@ -4087,6 +4147,7 @@ function atualizarPlanejamento() {
 }
 
 function atualizarTudo() {
+  atualizarVisibilidadeAdmin();
   atualizarOpcoesCategorias();
   atualizarListaGerenciarCategorias();
   atualizarTela();

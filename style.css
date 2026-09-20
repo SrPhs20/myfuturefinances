@@ -714,6 +714,112 @@ span.flatpickr-weekday {
   flex-wrap: wrap;
 }
 
+/* ---------- Botão de menu (abre a gaveta liquid glass) ---------- */
+.menu-glass-trigger {
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--forest-800);
+  background: rgba(255, 255, 255, .7);
+  box-shadow: none;
+  flex-shrink: 0;
+}
+.menu-glass-trigger:hover { background: var(--mint-100); box-shadow: none; transform: none; }
+.menu-glass-trigger svg { width: 20px; height: 20px; }
+
+body.menu-glass-aberto { overflow: hidden; }
+
+.menu-glass-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 19500;
+  background: rgba(11, 43, 30, .28);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.menu-glass-overlay.hidden { display: none; }
+
+/* A gaveta em si: vidro fosco de verdade (fundo translúcido + blur forte),
+   deslizando da borda direita — mesmo comportamento no mobile e no desktop,
+   como pedido ("liquid glass para sanduíche no mobile e no desktop"). */
+.menu-glass-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(84vw, 320px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  background: rgba(255, 253, 247, .68);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border-left: 1px solid rgba(255, 255, 255, .5);
+  box-shadow: -20px 0 55px rgba(11, 43, 30, .22);
+  animation: menuGlassDeslizar .24s cubic-bezier(.2,.8,.2,1);
+}
+body.reduz-movimento .menu-glass-panel { animation: none; }
+
+@keyframes menuGlassDeslizar {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.menu-glass-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(23, 49, 38, .12);
+}
+.menu-glass-header span { font-weight: 800; color: var(--forest-950); letter-spacing: -.01em; }
+
+.menu-glass-close {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--muted);
+  background: rgba(255, 255, 255, .6);
+  box-shadow: none;
+}
+.menu-glass-close:hover { background: rgba(255, 255, 255, .9); box-shadow: none; transform: none; }
+
+.menu-glass-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 12px;
+  border: 0;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .35);
+  color: var(--forest-900);
+  font-weight: 650;
+  font-size: .92rem;
+  text-align: left;
+  box-shadow: none;
+}
+.menu-glass-item:hover { background: rgba(255, 255, 255, .65); box-shadow: none; transform: none; }
+.menu-glass-item .button-icon { width: 19px; height: 19px; flex-shrink: 0; }
+.menu-glass-item-danger { color: var(--danger); }
+
 .profile-avatar {
   width: 38px;
   height: 38px;
