@@ -1599,37 +1599,156 @@ tbody tr:hover { background: #f4f8f3; }
 .cartao-visual-wrap {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: linear-gradient(145deg, #fffef9, #f3f8f3);
 }
 
-.cartao-visual {
+/* Cartão com efeito de virar: .cartao-visual-flip define o tamanho real
+   (proporção de cartão de verdade) e a perspectiva 3D; .cartao-visual-inner
+   gira; cada face (frente/verso) é um .cartao-visual absoluto preenchendo a
+   caixa, com backface-visibility escondendo a face que está de costas. */
+.cartao-visual-flip {
   position: relative;
+  aspect-ratio: 1.586 / 1;
+  perspective: 1200px;
+}
+.cartao-visual-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform .5s cubic-bezier(.4, .2, .2, 1);
+  transform-style: preserve-3d;
+}
+.cartao-visual-flip.virado .cartao-visual-inner { transform: rotateY(180deg); }
+body.reduz-movimento .cartao-visual-inner { transition: none; }
+
+.cartao-visual {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  aspect-ratio: 1.586 / 1;
   padding: 18px;
   border-radius: 16px;
   box-shadow: 0 10px 24px -12px rgba(11, 43, 30, .45);
   overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
+.cartao-visual-face-verso { transform: rotateY(180deg); }
 .cartao-visual::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 85% -10%, rgba(255, 255, 255, .28), transparent 55%);
+  background:
+    radial-gradient(circle at 85% -10%, rgba(255, 255, 255, .28), transparent 55%),
+    linear-gradient(120deg, transparent 40%, rgba(255, 255, 255, .1) 50%, transparent 60%);
   pointer-events: none;
 }
+
+.cartao-visual-flip-botao {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  bottom: -10px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  margin: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(23, 49, 38, .85);
+  box-shadow: 0 4px 10px rgba(11, 43, 30, .3);
+}
+.cartao-visual-flip-botao:hover { background: rgba(23, 49, 38, 1); box-shadow: 0 4px 10px rgba(11, 43, 30, .3); transform: translateY(-1px); }
+.cartao-visual-flip-botao svg { width: 15px; height: 15px; }
+
 .cartao-visual-top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .cartao-visual-banco { font-size: .92rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
-.cartao-visual-chip { flex-shrink: 0; width: 34px; height: 24px; border-radius: 6px; background: linear-gradient(145deg, rgba(255, 255, 255, .85), rgba(255, 255, 255, .4)); }
+
+/* Chip com textura (contatos gravados), em vez do retângulo liso de antes. */
+.cartao-visual-chip {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #f4dfa0, #c8a24a 45%, #8a6b28);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
+}
+.cartao-visual-chip::before {
+  content: "";
+  position: absolute;
+  inset: 3px 5px;
+  border: 1px solid rgba(0, 0, 0, .2);
+  border-radius: 3px;
+}
+.cartao-visual-chip::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  top: 50%;
+  height: 1px;
+  background: rgba(0, 0, 0, .18);
+  box-shadow: 0 -6px 0 rgba(0, 0, 0, .14), 0 6px 0 rgba(0, 0, 0, .14);
+}
+
+/* Símbolo de aproximação (contactless) — o mesmo selo universal usado em
+   cartões reais de qualquer banco/bandeira, não a logo de uma marca
+   específica. Fica perto do chip, como no cartão físico. */
+.cartao-visual-contactless {
+  position: absolute;
+  top: 52px;
+  right: 20px;
+  width: 20px;
+  height: 20px;
+  opacity: .9;
+}
+
 .cartao-visual-numero { position: relative; margin: 14px 0; font-family: "Courier New", monospace; font-size: 1.05rem; letter-spacing: .12em; }
 .cartao-visual-bottom { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; opacity: .92; }
 .cartao-visual-bottom span:first-child { overflow: hidden; max-width: 60%; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Verso do cartão: tarja magnética + tarja de assinatura com CVV mascarado. */
+.cartao-visual-tarja {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 20px;
+  height: 34px;
+  background: rgba(0, 0, 0, .55);
+}
+.cartao-visual-assinatura {
+  position: relative;
+  margin-top: 66px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cartao-visual-assinatura-linhas {
+  flex: 1;
+  height: 26px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .55) 0 3px, rgba(255, 255, 255, .3) 3px 6px);
+}
+.cartao-visual-cvv {
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .85);
+  color: #1a1a1a;
+  font-family: "Courier New", monospace;
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
 
 .cartao-visual-info { display: flex; flex-direction: column; gap: 8px; }
 .cartao-visual-info-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }

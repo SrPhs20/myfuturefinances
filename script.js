@@ -595,6 +595,27 @@ function estiloCartaoBanco(nome) {
   return { rotulo: null, grad: [cor.dot, cor.fg], texto: "#ffffff" };
 }
 
+/* Mistura duas cores hex num ponto 0–1 do caminho entre elas — usada para
+   dar um terceiro tom ao gradiente do cartão (mais profundidade que um
+   gradiente reto de 2 cores). */
+function misturarCores(hexA, hexB, t) {
+  const paraRGB = hex => {
+    let h = hex.replace("#", "");
+    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    const num = parseInt(h, 16);
+    return [num >> 16 & 255, num >> 8 & 255, num & 255];
+  };
+  const [ra, ga, ba] = paraRGB(hexA);
+  const [rb, gb, bb] = paraRGB(hexB);
+  const mix = (x, y) => Math.round(x + (y - x) * t);
+  return `rgb(${mix(ra, rb)}, ${mix(ga, gb)}, ${mix(ba, bb)})`;
+}
+
+function gradienteCartaoCSS(banco) {
+  const meio = misturarCores(banco.grad[0], banco.grad[1], .55);
+  return `linear-gradient(135deg, ${banco.grad[0]} 0%, ${meio} 55%, ${banco.grad[1]} 100%)`;
+}
+
 /* Seletor customizado e acessível — substitui a aparência nativa do
    <select> mantendo o elemento original como fonte de valor para o
    restante do script (contrato de dados preservado). */
@@ -3785,15 +3806,38 @@ function atualizarCartoesRegistrados() {
 
     return `
       <article class="cartao-visual-wrap cartao-visual-wrap-clicavel" data-cartao-id="${cartao.id}" onclick="verComprasDoCartao(${cartao.id})" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){verComprasDoCartao(${cartao.id})}" aria-label="Ver compras do cartão ${escaparHTML(cartao.nome)}">
-        <div class="cartao-visual" style="background:linear-gradient(135deg, ${banco.grad[0]}, ${banco.grad[1]}); color:${banco.texto};">
-          <div class="cartao-visual-top">
-            <span class="cartao-visual-banco">${escaparHTML(banco.rotulo || cartao.nome)}</span>
-            <span class="cartao-visual-chip" aria-hidden="true"></span>
-          </div>
-          <div class="cartao-visual-numero">•••• •••• •••• ${cartao.final ? escaparHTML(cartao.final) : "----"}</div>
-          <div class="cartao-visual-bottom">
-            <span>${escaparHTML(cartao.nome)}</span>
-            <span>Vence dia ${cartao.dia_vencimento}</span>
+        <div class="cartao-visual-flip">
+          <button type="button" class="cartao-visual-flip-botao" onclick="event.stopPropagation(); this.closest('.cartao-visual-flip').classList.toggle('virado')" aria-label="Virar cartão para ver o verso">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4v5h5M20 20v-5h-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 9A7 7 0 0 1 19 12M18.5 15a7 7 0 0 1-13.5-3" stroke-linecap="round"/></svg>
+          </button>
+          <div class="cartao-visual-inner">
+            <div class="cartao-visual cartao-visual-face-frente" style="background:${gradienteCartaoCSS(banco)}; color:${banco.texto};">
+              <div class="cartao-visual-top">
+                <span class="cartao-visual-banco">${escaparHTML(banco.rotulo || cartao.nome)}</span>
+                <span class="cartao-visual-chip" aria-hidden="true"></span>
+              </div>
+              <svg class="cartao-visual-contactless" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <path d="M7 16a7 7 0 0 1 0-9" stroke-linecap="round" opacity=".5"/>
+                <path d="M10 15a4.2 4.2 0 0 1 0-6" stroke-linecap="round" opacity=".75"/>
+                <path d="M13 14a1.6 1.6 0 0 1 0-4" stroke-linecap="round"/>
+              </svg>
+              <div class="cartao-visual-numero">•••• •••• •••• ${cartao.final ? escaparHTML(cartao.final) : "----"}</div>
+              <div class="cartao-visual-bottom">
+                <span>${escaparHTML(cartao.nome)}</span>
+                <span>Vence dia ${cartao.dia_vencimento}</span>
+              </div>
+            </div>
+            <div class="cartao-visual cartao-visual-face-verso" style="background:${gradienteCartaoCSS(banco)}; color:${banco.texto};">
+              <span class="cartao-visual-tarja" aria-hidden="true"></span>
+              <div class="cartao-visual-assinatura">
+                <span class="cartao-visual-assinatura-linhas" aria-hidden="true"></span>
+                <span class="cartao-visual-cvv">•••</span>
+              </div>
+              <div class="cartao-visual-bottom">
+                <span>${escaparHTML(banco.rotulo || cartao.nome)}</span>
+                <span>•••• ${cartao.final ? escaparHTML(cartao.final) : "----"}</span>
+              </div>
+            </div>
           </div>
         </div>
         <div class="cartao-visual-info">
