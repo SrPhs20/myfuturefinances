@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=42" />
+  <link rel="stylesheet" href="style.css?v=43" />
 </head>
 <body>
   <div class="container">
@@ -562,8 +562,9 @@
             <label>Nome do objetivo</label>
             <input id="objetivoNome" placeholder="Ex. Viagem, entrada do apartamento" required />
             <label>Tipo</label>
-            <select id="objetivoTipo"><option value="objetivo">Objetivo</option><option value="reserva_emergencia">Reserva de emergência</option></select>
-            <div class="form-row"><div><label>Valor alvo</label><input id="objetivoValorAlvo" type="number" min="0.01" step="0.01" required /></div><div><label>Já guardado</label><input id="objetivoValorAtual" type="number" min="0" step="0.01" value="0" required /></div></div>
+            <select id="objetivoTipo"><option value="objetivo">Objetivo</option><option value="reserva_emergencia">Reserva de emergência</option><option value="caixinha">Caixinha (sem limite)</option></select>
+            <div class="form-row" id="linhaObjetivoValores"><div id="campoObjetivoValorAlvo"><label>Valor alvo</label><input id="objetivoValorAlvo" type="number" min="0.01" step="0.01" required /></div><div><label>Já guardado</label><input id="objetivoValorAtual" type="number" min="0" step="0.01" value="0" required /></div></div>
+            <div id="campoObjetivoLocal" class="hidden"><label>Onde você guarda esse dinheiro (opcional)</label><input id="objetivoLocal" placeholder="Ex. Nubank, poupança, dinheiro em casa" maxlength="80" /></div>
             <label>Prazo (opcional)</label>
             <input id="objetivoPrazo" type="date" />
             <button id="botaoObjetivo" type="submit">Salvar objetivo</button>
@@ -602,6 +603,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=41"></script>
+  <script src="script.js?v=42"></script>
 </body>
 </html>

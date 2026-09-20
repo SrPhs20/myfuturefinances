@@ -855,6 +855,25 @@ mfRealcarSelect("tipo");
 mfRealcarSelect("filtroTipo");
 mfRealcarSelect("objetivoTipo");
 
+/* Objetivo do tipo "caixinha": uma reserva sem valor-alvo (o usuário só quer
+   acompanhar quanto já guardou e, opcionalmente, onde guardou), diferente de
+   "objetivo"/"reserva_emergencia" que têm uma meta em R$. Este helper
+   mostra/esconde os campos certos do formulário conforme o tipo escolhido. */
+function mfAtualizarCamposObjetivo() {
+  const tipo = document.getElementById("objetivoTipo")?.value;
+  const ehCaixinha = tipo === "caixinha";
+  const linhaValores = document.getElementById("linhaObjetivoValores");
+  const campoAlvo = document.getElementById("campoObjetivoValorAlvo");
+  const campoLocal = document.getElementById("campoObjetivoLocal");
+  const inputAlvo = document.getElementById("objetivoValorAlvo");
+  if (linhaValores) linhaValores.classList.toggle("somente-um", ehCaixinha);
+  if (campoAlvo) campoAlvo.classList.toggle("hidden", ehCaixinha);
+  if (campoLocal) campoLocal.classList.toggle("hidden", !ehCaixinha);
+  if (inputAlvo) inputAlvo.required = !ehCaixinha;
+}
+document.getElementById("objetivoTipo")?.addEventListener("change", mfAtualizarCamposObjetivo);
+mfAtualizarCamposObjetivo();
+
 function formatarMoeda(valor) {
   return Number(valor).toLocaleString("pt-BR", {
     style: "currency",
@@ -2855,15 +2874,20 @@ async function importarDados(event) {
       limite: Number(item.limite)
     }));
 
-    const novosObjetivos = (dados.objetivosFinanceiros || []).map(item => ({
-      user_id: usuarioAtual.id,
-      nome: item.nome,
-      tipo: item.tipo === "reserva_emergencia" ? "reserva_emergencia" : "objetivo",
-      valor_alvo: Number(item.valor_alvo),
-      valor_atual: Number(item.valor_atual || 0),
-      prazo: item.prazo || null,
-      status: ["ativo", "concluido", "pausado"].includes(item.status) ? item.status : "ativo"
-    }));
+    const novosObjetivos = (dados.objetivosFinanceiros || []).map(item => {
+      const tipo = ["reserva_emergencia", "caixinha"].includes(item.tipo) ? item.tipo : "objetivo";
+      const ehCaixinha = tipo === "caixinha";
+      return {
+        user_id: usuarioAtual.id,
+        nome: item.nome,
+        tipo,
+        valor_alvo: ehCaixinha ? null : Number(item.valor_alvo),
+        valor_atual: Number(item.valor_atual || 0),
+        prazo: item.prazo || null,
+        local: ehCaixinha && item.local ? String(item.local).trim() : null,
+        status: ["ativo", "concluido", "pausado"].includes(item.status) ? item.status : "ativo"
+      };
+    });
 
     const operacoes = [];
     if (novosLancamentos.length) operacoes.push(supabaseClient.from("lancamentos").insert(novosLancamentos));
@@ -4138,18 +4162,22 @@ async function removerOrcamento(id) {
 
 document.getElementById("formObjetivo").addEventListener("submit", async function(event) {
   event.preventDefault();
-  const valorAlvo = Number(document.getElementById("objetivoValorAlvo").value);
+  const tipo = document.getElementById("objetivoTipo").value;
+  const ehCaixinha = tipo === "caixinha";
+  const valorAlvo = ehCaixinha ? null : Number(document.getElementById("objetivoValorAlvo").value);
   const valorAtual = Number(document.getElementById("objetivoValorAtual").value);
+  const local = document.getElementById("objetivoLocal").value.trim();
   const dados = {
     user_id: usuarioAtual.id,
     nome: document.getElementById("objetivoNome").value.trim(),
-    tipo: document.getElementById("objetivoTipo").value,
+    tipo,
     valor_alvo: valorAlvo,
     valor_atual: valorAtual,
     prazo: document.getElementById("objetivoPrazo").value || null,
-    status: valorAtual >= valorAlvo ? "concluido" : "ativo"
+    local: ehCaixinha && local ? local : null,
+    status: !ehCaixinha && valorAtual >= valorAlvo ? "concluido" : "ativo"
   };
-  if (!dados.nome || valorAlvo <= 0 || valorAtual < 0) return mfToast("Revise os dados do objetivo.");
+  if (!dados.nome || valorAtual < 0 || (!ehCaixinha && !(valorAlvo > 0))) return mfToast("Revise os dados do objetivo.");
   const resposta = editandoObjetivoId
     ? await supabaseClient.from("objetivos_financeiros").update(dados).eq("id", editandoObjetivoId).eq("user_id", usuarioAtual.id)
     : await supabaseClient.from("objetivos_financeiros").insert([dados]);
@@ -4165,8 +4193,10 @@ function editarObjetivo(id) {
   document.getElementById("objetivoNome").value = item.nome;
   document.getElementById("objetivoTipo").value = item.tipo;
   mfAtualizarSelectRealcado("objetivoTipo");
-  document.getElementById("objetivoValorAlvo").value = item.valor_alvo;
+  mfAtualizarCamposObjetivo();
+  document.getElementById("objetivoValorAlvo").value = item.valor_alvo || "";
   document.getElementById("objetivoValorAtual").value = item.valor_atual;
+  document.getElementById("objetivoLocal").value = item.local || "";
   if (calendarioObjetivoPrazo) {
     if (item.prazo) calendarioObjetivoPrazo.setDate(item.prazo, true);
     else calendarioObjetivoPrazo.clear();
@@ -4182,6 +4212,7 @@ function cancelarEdicaoObjetivo() {
   editandoObjetivoId = null;
   document.getElementById("formObjetivo").reset();
   mfAtualizarSelectRealcado("objetivoTipo");
+  mfAtualizarCamposObjetivo();
   if (calendarioObjetivoPrazo) calendarioObjetivoPrazo.clear();
   document.getElementById("objetivoValorAtual").value = 0;
   document.getElementById("tituloFormObjetivo").textContent = "Transforme um plano em número";
@@ -4274,8 +4305,18 @@ function atualizarPlanejamento() {
 
   const listaObjetivos = document.getElementById("listaObjetivos");
   listaObjetivos.innerHTML = objetivosFinanceiros.length ? objetivosFinanceiros.map(item => {
-    const alvo = Number(item.valor_alvo), atual = Number(item.valor_atual), progresso = Math.min(100, atual / alvo * 100);
-    return `<div class="goal-item ${item.status === "concluido" ? "goal-complete" : ""}"><div class="goal-heading"><div><span class="goal-type">${item.tipo === "reserva_emergencia" ? "Reserva" : "Objetivo"}</span><h3>${escaparHTML(item.nome)}</h3></div><strong>${Math.round(progresso)}%</strong></div><div class="budget-track"><span class="goal-progress" style="width:${progresso}%"></span></div><p>${formatarMoeda(atual)} de ${formatarMoeda(alvo)}${item.prazo ? ` · até ${formatarData(item.prazo)}` : ""}</p><div class="goal-actions"><button onclick="aportarObjetivo(${item.id})" ${item.status === "concluido" ? "disabled" : ""}>+ Adicionar valor</button><button class="secondary" onclick="editarObjetivo(${item.id})">Editar</button><button class="link-button danger-text" onclick="removerObjetivo(${item.id})">Excluir</button></div></div>`;
+    const ehCaixinha = item.tipo === "caixinha";
+    const atual = Number(item.valor_atual);
+    const alvo = Number(item.valor_alvo) || 0;
+    const progresso = alvo > 0 ? Math.min(100, atual / alvo * 100) : 0;
+    const rotuloTipo = item.tipo === "reserva_emergencia" ? "Reserva" : ehCaixinha ? "Caixinha" : "Objetivo";
+    const cabecalhoDireita = ehCaixinha ? "" : `<strong>${Math.round(progresso)}%</strong>`;
+    const barra = ehCaixinha ? "" : `<div class="budget-track"><span class="goal-progress" style="width:${progresso}%"></span></div>`;
+    const legenda = ehCaixinha
+      ? `${formatarMoeda(atual)} guardado até agora${item.prazo ? ` · meta até ${formatarData(item.prazo)}` : ""}`
+      : `${formatarMoeda(atual)} de ${formatarMoeda(alvo)}${item.prazo ? ` · até ${formatarData(item.prazo)}` : ""}`;
+    const linhaLocal = item.local ? `<p class="goal-local">Guardado em ${escaparHTML(item.local)}</p>` : "";
+    return `<div class="goal-item ${item.status === "concluido" ? "goal-complete" : ""}"><div class="goal-heading"><div><span class="goal-type">${rotuloTipo}</span><h3>${escaparHTML(item.nome)}</h3></div>${cabecalhoDireita}</div>${barra}<p>${legenda}</p>${linhaLocal}<div class="goal-actions"><button onclick="aportarObjetivo(${item.id})" ${item.status === "concluido" ? "disabled" : ""}>+ Adicionar valor</button><button class="secondary" onclick="editarObjetivo(${item.id})">Editar</button><button class="link-button danger-text" onclick="removerObjetivo(${item.id})">Excluir</button></div></div>`;
   }).join("") : '<p class="empty-state">Cadastre uma reserva, uma viagem ou qualquer plano que mereça prioridade.</p>';
   document.getElementById("resumoObjetivos").textContent = objetivosFinanceiros.length ? `${objetivosFinanceiros.filter(item => item.status === "concluido").length}/${objetivosFinanceiros.length} concluídos` : "Nenhum criado";
 }

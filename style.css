@@ -961,7 +961,8 @@ body.reduz-movimento .menu-glass-panel { animation: none; }
 .planning-total { min-width:220px; padding:16px 20px; border:1px solid rgba(255,255,255,.22); border-radius:16px; background:rgba(255,255,255,.1); }
 .planning-total span { display:block; font-size:.76rem; color:#ccfbf1; }.planning-total strong { display:block; margin-top:4px; font-size:1.45rem; }
 .planning-form { margin-top:0; border-top:4px solid #2563eb; }
-.planning-form h2 { margin:2px 0 8px; }.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }.form-row input { width:100%; }
+.planning-form h2 { margin:2px 0 8px; }.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }.form-row input { width:100%; }.form-row.somente-um { grid-template-columns:1fr; }
+.goal-item p.goal-local { margin-top:2px; font-weight:650; color:#2563eb; }
 .soft-pill, .goal-type { padding:5px 9px; border-radius:999px; color:#1d4ed8; background:#dbeafe; font-size:.72rem; font-weight:700; }
 #listaOrcamentos, #listaObjetivos { display:flex; flex-direction:column; gap:var(--space-3, 12px); }
 .budget-item, .goal-item { padding:16px 18px; border:1px solid #e2e8f0; border-radius:var(--radius-lg, 16px); background:#fff; box-shadow:0 6px 16px rgba(15,23,42,.05); transition:transform .18s ease, box-shadow .18s ease; }
@@ -1303,6 +1304,7 @@ form > button { justify-self: start; min-width: 176px; }
 .link-button:hover { color: var(--forest-900); background: var(--mint-50); box-shadow: none; }
 .budget-item, .goal-item { border-color: var(--line); background: var(--ivory); box-shadow: 0 6px 16px rgba(24,65,45,.06); }
 .budget-item:hover, .goal-item:hover { box-shadow: 0 10px 22px rgba(24,65,45,.1); }
+.goal-item p.goal-local { color: var(--emerald-700); }
 .planning-donut-center { background: var(--ivory); box-shadow: inset 0 0 0 1px rgba(24,65,45,.08); }
 .planning-donut-center span { color: var(--muted); }
 .planning-donut-center strong { color: var(--forest-950); }
