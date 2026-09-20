@@ -1504,11 +1504,45 @@ function limparFormularioLancamento() {
   editandoId = null;
   botaoLancamento.textContent = "Adicionar lançamento";
   avisoEdicao.classList.add("hidden");
+
+  const tituloModal = document.getElementById("lancamentoModalTitulo");
+  if (tituloModal) tituloModal.textContent = "Novo lançamento";
 }
 
 function cancelarEdicao() {
   limparFormularioLancamento();
 }
+
+/* Modal de lançamento: mesmo formulário de sempre, agora escondido até o
+   usuário pedir (botão "Novo lançamento" ou "Editar" na tabela) em vez de
+   ficar sempre visível ocupando a tela. Abre como janela central no desktop
+   e como folha subindo de baixo no mobile — ver CSS (.lancamento-modal-*). */
+function abrirModalLancamento(emEdicao = false) {
+  const overlay = document.getElementById("lancamentoModalOverlay");
+  if (!overlay) return;
+  if (!emEdicao) limparFormularioLancamento();
+  overlay.classList.remove("hidden");
+  document.body.classList.add("lancamento-modal-aberto");
+  setTimeout(() => document.getElementById(emEdicao ? "descricao" : "categoria")?.focus(), 60);
+}
+
+function fecharModalLancamento() {
+  const overlay = document.getElementById("lancamentoModalOverlay");
+  if (!overlay) return;
+  overlay.classList.add("hidden");
+  document.body.classList.remove("lancamento-modal-aberto");
+  if (editandoId) cancelarEdicao();
+}
+
+function mfCliqueForaLancamento(event) {
+  if (event.target.id === "lancamentoModalOverlay") fecharModalLancamento();
+}
+
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  const overlay = document.getElementById("lancamentoModalOverlay");
+  if (overlay && !overlay.classList.contains("hidden")) fecharModalLancamento();
+});
 
 function atualizarTela() {
   lista.innerHTML = "";
@@ -1614,6 +1648,7 @@ form.addEventListener("submit", async function(e) {
   await carregarDados();
   atualizarTela();
   limparFormularioLancamento();
+  fecharModalLancamento();
 });
 
 function editarLancamento(id) {
@@ -1637,14 +1672,11 @@ function editarLancamento(id) {
   botaoLancamento.textContent = "Salvar alterações";
   avisoEdicao.classList.remove("hidden");
 
-  mostrarAba("lancamentos");
+  const tituloModal = document.getElementById("lancamentoModalTitulo");
+  if (tituloModal) tituloModal.textContent = "Editar lançamento";
 
-  setTimeout(() => {
-    form.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
-  }, 100);
+  mostrarAba("lancamentos");
+  abrirModalLancamento(true);
 }
 
 async function remover(id) {
