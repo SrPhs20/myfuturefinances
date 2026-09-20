@@ -2205,7 +2205,10 @@ body.reduz-movimento .aba-entrando { animation: none; }
    seção, não importa onde o campo esteja na tela. */
 .select-listbox {
   position: absolute;
-  z-index: 550;
+  /* Mais alto que qualquer modal do app (lançamento: 20050, confirmação:
+     20100) — sem isso, abrir o seletor dentro de um modal renderiza o menu
+     atrás do próprio modal, escondido e inclicável. */
+  z-index: 21000;
   top: 0;
   left: 0;
   right: auto;
