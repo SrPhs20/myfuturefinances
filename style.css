@@ -2698,6 +2698,43 @@ body.reduz-movimento .lancamento-modal-card { animation: none; }
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* ---------- Motion: tokens padronizados e feedback de toque (Etapa 7) ----------
+   Duração/easing consolidados em variáveis (150-300ms, sempre com uma curva de
+   saída suave) para uso em qualquer novo componente. As regras :active abaixo
+   ficam de propósito no final da folha de estilo: como muitos componentes têm
+   ":hover { transform: none }" espalhado pelo arquivo, declarar o feedback de
+   toque aqui garante que ele vença o empate de especificidade e apareça mesmo
+   quando o elemento está hover+active ao mesmo tempo (mouse) e sozinho no
+   toque (celular). Tudo isto já respeita prefers-reduced-motion, que zera
+   duração de transições/animações globalmente logo abaixo. */
+:root {
+  --ease-standard: cubic-bezier(.2, .8, .2, 1);
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 300ms;
+}
+
+button:active {
+  transform: translateY(0) scale(.97);
+  box-shadow: 0 4px 10px rgba(18, 61, 43, .16);
+}
+.secondary:active { box-shadow: 0 2px 8px rgba(24, 65, 45, .08); }
+.danger:active { box-shadow: 0 2px 8px rgba(183, 71, 61, .08); }
+.link-button:active { background: var(--mint-50); box-shadow: none; }
+.small-button:active { transform: scale(.95); }
+
+.tab:active, .bottom-tab:active { transform: scale(.94); }
+.card:active { transform: translateY(-1px) scale(.99); }
+.budget-item:active, .goal-item:active { transform: scale(.98); }
+.categoria-chip-label:active { transform: scale(.95); }
+.filter-chip:active { transform: scale(.93); }
+.group-card-clicavel:active { transform: scale(.98); }
+.cartao-visual-wrap-clicavel:active { transform: scale(.97); }
+.select-trigger:active { transform: scale(.98); }
+.menu-glass-item:active { transform: scale(.97); }
+.menu-glass-trigger:active { transform: scale(.9); }
+.botao-novo-lancamento:active { transform: scale(.96); }
+
 /* ---------- Estados vazios com orientação de próxima ação ---------- */
 .empty-state {
   display: grid;

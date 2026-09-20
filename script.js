@@ -344,6 +344,32 @@ function mensagemErro(error, fallback) {
   return error?.message || fallback;
 }
 
+/* Motion: origem de abertura de modais/gavetas — em vez de a janela apenas
+   "aparecer" no centro da tela, ela nasce visualmente do botão que a abriu
+   (pedido explícito: animar entrada de modais a partir do elemento que os
+   abriu). mfOrigemClique lê a posição do gatilho (o elemento focado no
+   momento, que é sempre o botão clicado); mfAplicarOrigemAnimacao converte
+   essa posição em um transform-origin relativo ao card do modal, para que a
+   animação de "aparecer" (já definida em CSS) escale a partir dali. Sem
+   efeito nenhum quando o usuário pediu movimento reduzido. */
+function mfOrigemClique(triggerEl) {
+  if (document.body.classList.contains("reduz-movimento")) return null;
+  if (!triggerEl || typeof triggerEl.getBoundingClientRect !== "function") return null;
+  const r = triggerEl.getBoundingClientRect();
+  if (!r.width && !r.height) return null;
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+function mfAplicarOrigemAnimacao(cardEl, origem) {
+  if (!cardEl) return;
+  if (!origem) { cardEl.style.transformOrigin = ""; return; }
+  const r = cardEl.getBoundingClientRect();
+  if (!r.width || !r.height) { cardEl.style.transformOrigin = ""; return; }
+  const ox = Math.max(0, Math.min(100, (origem.x - r.left) / r.width * 100));
+  const oy = Math.max(0, Math.min(100, (origem.y - r.top) / r.height * 100));
+  cardEl.style.transformOrigin = `${ox.toFixed(1)}% ${oy.toFixed(1)}%`;
+}
+
 /* ==========================================================================
    Componentes de UI premium: toasts, modal de confirmação/prompt e
    seletor customizado acessível (substitui alert/confirm/prompt nativos
@@ -458,6 +484,7 @@ function mfAbrirDialog({ titulo, texto, tipo = "confirm", danger = false, valorI
     }
 
     overlay.classList.remove("hidden");
+    mfAplicarOrigemAnimacao(card, mfOrigemClique(mfDialogFocoAnterior));
     document.addEventListener("keydown", mfDialogTeclado, true);
 
     (tipo === "prompt" ? input : botaoConfirmar).focus();
@@ -1562,8 +1589,10 @@ function cancelarEdicao() {
 function abrirModalLancamento(emEdicao = false) {
   const overlay = document.getElementById("lancamentoModalOverlay");
   if (!overlay) return;
+  const origem = mfOrigemClique(document.activeElement);
   if (!emEdicao) limparFormularioLancamento();
   overlay.classList.remove("hidden");
+  mfAplicarOrigemAnimacao(overlay.querySelector(".lancamento-modal-card"), origem);
   document.body.classList.add("lancamento-modal-aberto");
   setTimeout(() => document.getElementById(emEdicao ? "descricao" : "categoria")?.focus(), 60);
 }
@@ -2956,9 +2985,21 @@ function atualizarVisibilidadeAdmin() {
 function abrirMenuGlass() {
   const overlay = document.getElementById("menuGlassOverlay");
   if (!overlay) return;
+  const botaoTrigger = document.getElementById("botaoMenuGlass");
+  const origem = mfOrigemClique(botaoTrigger);
   atualizarVisibilidadeAdmin();
   overlay.classList.remove("hidden");
-  document.getElementById("botaoMenuGlass")?.setAttribute("aria-expanded", "true");
+  const painel = document.getElementById("menuGlassPanel");
+  if (painel) {
+    if (origem) {
+      const r = painel.getBoundingClientRect();
+      const oy = r.height ? Math.max(0, Math.min(100, (origem.y - r.top) / r.height * 100)) : 50;
+      painel.style.transformOrigin = `100% ${oy.toFixed(1)}%`;
+    } else {
+      painel.style.transformOrigin = "";
+    }
+  }
+  botaoTrigger?.setAttribute("aria-expanded", "true");
   document.body.classList.add("menu-glass-aberto");
 }
 
