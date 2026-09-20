@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Minhas Finanças</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=40" />
+  <link rel="stylesheet" href="style.css?v=41" />
 </head>
 <body>
   <div class="container">
@@ -508,6 +508,36 @@
         <div class="planning-total"><span>Disponível nos orçamentos</span><strong id="saldoOrcamentos">R$ 0,00</strong></div>
       </div>
 
+      <div class="cards planning-summary-cards">
+        <div class="card">
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6.5" width="18" height="12" rx="2.5"/><path d="M3 10.5h18" stroke-linecap="round"/><circle cx="16.5" cy="14.5" r="1" fill="currentColor" stroke="none"/></svg>Planejado no mês</h2>
+          <div id="planCardPlanejado" class="value blue">R$ 0,00</div>
+        </div>
+        <div class="card">
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8.5 12.5L12 16l3.5-3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Já gasto</h2>
+          <div id="planCardGasto" class="value negative">R$ 0,00</div>
+        </div>
+        <div class="card">
+          <h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3.5l9.5 16.5H2.5z" stroke-linejoin="round"/><path d="M12 10v4" stroke-linecap="round"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>Categorias no limite</h2>
+          <div id="planCardAlerta" class="value">0</div>
+          <span id="planCardAlertaDetalhe" class="value-count">sem orçamentos no mês</span>
+        </div>
+      </div>
+
+      <div class="chart planning-donut-card">
+        <div class="section-heading">
+          <div><span class="eyebrow">Distribuição</span><h2><svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5A8.5 8.5 0 0 1 20.5 12H12V3.5z"/></svg>Para onde vai o orçamento planejado</h2></div>
+        </div>
+        <p id="planDonutVazio" class="empty-state">Crie orçamentos por categoria para ver a distribuição aqui.</p>
+        <div id="planDonutConteudo" class="planning-donut-wrap hidden">
+          <div class="planning-donut-outer">
+            <div id="planDonutVisual" class="planning-donut"></div>
+            <div class="planning-donut-center"><span>Planejado</span><strong id="planDonutTotal">R$ 0,00</strong></div>
+          </div>
+          <div id="planDonutLegenda" class="planning-donut-legend"></div>
+        </div>
+      </div>
+
       <div class="planning-grid">
         <div>
           <form id="formOrcamento" class="planning-form">
@@ -572,6 +602,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=39"></script>
+  <script src="script.js?v=40"></script>
 </body>
 </html>

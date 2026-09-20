@@ -963,11 +963,27 @@ body.reduz-movimento .menu-glass-panel { animation: none; }
 .planning-form { margin-top:0; border-top:4px solid #2563eb; }
 .planning-form h2 { margin:2px 0 8px; }.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }.form-row input { width:100%; }
 .soft-pill, .goal-type { padding:5px 9px; border-radius:999px; color:#1d4ed8; background:#dbeafe; font-size:.72rem; font-weight:700; }
-.budget-item, .goal-item { padding:15px 0; border-bottom:1px solid #e2e8f0; }.budget-item:last-child,.goal-item:last-child { border-bottom:0; }
-.budget-track { height:9px; overflow:hidden; margin:9px 0; border-radius:999px; background:#e2e8f0; }.budget-track span { display:block; height:100%; border-radius:inherit; }.budget-ok { background:#22c55e; }.budget-warning { background:#f59e0b; }.budget-danger { background:#ef4444; }.goal-progress { background:linear-gradient(90deg,#2563eb,#8b5cf6); }
+#listaOrcamentos, #listaObjetivos { display:flex; flex-direction:column; gap:var(--space-3, 12px); }
+.budget-item, .goal-item { padding:16px 18px; border:1px solid #e2e8f0; border-radius:var(--radius-lg, 16px); background:#fff; box-shadow:0 6px 16px rgba(15,23,42,.05); transition:transform .18s ease, box-shadow .18s ease; }
+.budget-item:hover, .goal-item:hover { transform:translateY(-2px); box-shadow:0 10px 22px rgba(15,23,42,.08); }
+.budget-track { height:9px; overflow:hidden; margin:9px 0; border-radius:999px; background:#e2e8f0; }.budget-track span { display:block; height:100%; border-radius:inherit; transition:width .35s ease; }.budget-ok { background:#22c55e; }.budget-warning { background:#f59e0b; }.budget-danger { background:#ef4444; }.goal-progress { background:linear-gradient(90deg,#2563eb,#8b5cf6); }
 .budget-footer small { color:#64748b; }.link-button { width:auto; margin:0; padding:5px 8px; border:0; color:#2563eb; background:transparent; box-shadow:none; }.link-button:hover { background:#eff6ff; }.danger-text { color:#dc2626; }
 .goal-heading h3 { margin:5px 0 0; }.goal-actions { display:flex; gap:8px; align-items:center; }.goal-actions button { width:auto; margin:0; padding:8px 11px; }.goal-complete { opacity:.72; }.goal-complete .goal-type { color:#166534; background:#dcfce7; }
 .empty-state { padding:18px; border:1px dashed #cbd5e1; border-radius:14px; text-align:center; color:#64748b; }
+
+/* Planejamento — cards de resumo e gráfico de rosca (Etapa 6) */
+.planning-summary-cards { margin-bottom:18px; }
+.planning-donut-card { margin-bottom:18px; }
+.planning-donut-wrap { display:flex; align-items:center; gap:28px; flex-wrap:wrap; margin-top:14px; }
+.planning-donut-outer { position:relative; flex:0 0 176px; width:176px; height:176px; }
+.planning-donut { width:100%; height:100%; border-radius:50%; transition:background .35s ease; }
+.planning-donut-center { position:absolute; inset:26px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:50%; background:#fff; box-shadow:inset 0 0 0 1px rgba(15,23,42,.06); text-align:center; }
+.planning-donut-center span { font-size:.68rem; color:#64748b; }
+.planning-donut-center strong { margin-top:3px; font-size:1.05rem; color:#0f172a; }
+.planning-donut-legend { flex:1; min-width:200px; display:flex; flex-direction:column; gap:9px; }
+.planning-donut-legend-item { display:flex; align-items:center; gap:9px; font-size:.85rem; color:#334155; }
+.planning-donut-legend-item .categoria-dot { flex:0 0 auto; }
+.planning-donut-legend-item strong { margin-left:auto; font-weight:700; }
 
 @media (max-width: 820px) {
   .coach-grid,.dashboard-columns,.planning-grid { grid-template-columns:1fr; }
@@ -1285,6 +1301,12 @@ form > button { justify-self: start; min-width: 176px; }
 .goal-progress { background: linear-gradient(90deg, var(--emerald-700), #63b987); }
 .link-button { color: var(--emerald-700); }
 .link-button:hover { color: var(--forest-900); background: var(--mint-50); box-shadow: none; }
+.budget-item, .goal-item { border-color: var(--line); background: var(--ivory); box-shadow: 0 6px 16px rgba(24,65,45,.06); }
+.budget-item:hover, .goal-item:hover { box-shadow: 0 10px 22px rgba(24,65,45,.1); }
+.planning-donut-center { background: var(--ivory); box-shadow: inset 0 0 0 1px rgba(24,65,45,.08); }
+.planning-donut-center span { color: var(--muted); }
+.planning-donut-center strong { color: var(--forest-950); }
+.planning-donut-legend-item { color: var(--forest-800); }
 
 table { background: rgba(255, 253, 247, .94); }
 th { color: #52695e; background: #edf4ee; }

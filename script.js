@@ -4164,23 +4164,72 @@ async function removerObjetivo(id) {
   await carregarDados(); atualizarTudo();
 }
 
+function atualizarGraficoPlanejamento(orcamentosMes, totalLimites) {
+  const vazio = document.getElementById("planDonutVazio");
+  const conteudo = document.getElementById("planDonutConteudo");
+  const visual = document.getElementById("planDonutVisual");
+  const totalEl = document.getElementById("planDonutTotal");
+  const legenda = document.getElementById("planDonutLegenda");
+  if (!vazio || !conteudo || !visual || !totalEl || !legenda) return;
+
+  if (!orcamentosMes.length || totalLimites <= 0) {
+    vazio.classList.remove("hidden");
+    conteudo.classList.add("hidden");
+    return;
+  }
+  vazio.classList.add("hidden");
+  conteudo.classList.remove("hidden");
+
+  const itens = orcamentosMes
+    .map(item => ({ nome: item.categoria, limite: Number(item.limite), cor: corParaCategoria(item.categoria) }))
+    .sort((a, b) => b.limite - a.limite);
+
+  let acumulado = 0;
+  const stops = itens.map(item => {
+    const inicio = acumulado / totalLimites * 360;
+    acumulado += item.limite;
+    const fim = acumulado / totalLimites * 360;
+    return `${item.cor.dot} ${inicio.toFixed(2)}deg ${fim.toFixed(2)}deg`;
+  }).join(", ");
+  visual.style.background = `conic-gradient(${stops})`;
+  totalEl.textContent = formatarMoeda(totalLimites);
+
+  legenda.innerHTML = itens.map(item => {
+    const percentual = item.limite / totalLimites * 100;
+    return `<div class="planning-donut-legend-item"><span class="categoria-dot" style="background:${item.cor.dot}"></span>${escaparHTML(item.nome)}<strong>${Math.round(percentual)}%</strong></div>`;
+  }).join("");
+}
+
 function atualizarPlanejamento() {
   if (!mesDashboard) return;
   const listaOrcamentos = document.getElementById("listaOrcamentos");
   const orcamentosMes = orcamentos.filter(item => item.mes?.slice(0, 7) === mesDashboard);
   let totalLimites = 0;
   let totalGasto = 0;
+  let categoriasAlerta = 0;
   listaOrcamentos.innerHTML = orcamentosMes.length ? orcamentosMes.map(item => {
     const limite = Number(item.limite);
     const gasto = gastoCategoria(item.categoria, mesDashboard);
     const percentual = limite > 0 ? gasto / limite * 100 : 0;
     totalLimites += limite; totalGasto += gasto;
     const classe = percentual > 100 ? "budget-danger" : percentual >= 80 ? "budget-warning" : "budget-ok";
+    if (classe !== "budget-ok") categoriasAlerta++;
     const corCategoria = corParaCategoria(item.categoria);
     return `<div class="budget-item"><div class="bar-label"><strong><span class="categoria-dot" style="background:${corCategoria.dot}"></span>${escaparHTML(item.categoria)}</strong><span>${formatarMoeda(gasto)} de ${formatarMoeda(limite)}</span></div><div class="budget-track"><span class="${classe}" style="width:${Math.min(percentual, 100)}%"></span></div><div class="budget-footer"><small>${Math.round(percentual)}% utilizado</small><div><button class="link-button" onclick="editarOrcamento(${item.id})">Editar</button><button class="link-button danger-text" onclick="removerOrcamento(${item.id})">Excluir</button></div></div></div>`;
   }).join("") : '<p class="empty-state">Crie seu primeiro limite para o mês selecionado.</p>';
   document.getElementById("saldoOrcamentos").textContent = formatarMoeda(totalLimites - totalGasto);
   document.getElementById("resumoOrcamentos").textContent = orcamentosMes.length ? `${orcamentosMes.length} categoria(s)` : "Nenhum criado";
+
+  const cardPlanejado = document.getElementById("planCardPlanejado");
+  const cardGasto = document.getElementById("planCardGasto");
+  const cardAlerta = document.getElementById("planCardAlerta");
+  const cardAlertaDetalhe = document.getElementById("planCardAlertaDetalhe");
+  if (cardPlanejado) cardPlanejado.textContent = formatarMoeda(totalLimites);
+  if (cardGasto) cardGasto.textContent = formatarMoeda(totalGasto);
+  if (cardAlerta) cardAlerta.textContent = String(categoriasAlerta);
+  if (cardAlertaDetalhe) cardAlertaDetalhe.textContent = orcamentosMes.length ? `de ${orcamentosMes.length} categoria(s)` : "sem orçamentos no mês";
+
+  atualizarGraficoPlanejamento(orcamentosMes, totalLimites);
 
   const listaObjetivos = document.getElementById("listaObjetivos");
   listaObjetivos.innerHTML = objetivosFinanceiros.length ? objetivosFinanceiros.map(item => {
