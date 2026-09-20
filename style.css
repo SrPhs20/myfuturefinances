@@ -2700,6 +2700,103 @@ body.reduz-movimento .lancamento-modal-card { animation: none; }
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* ---------- Recorte de foto (segunda etapa ao escolher uma imagem) ---------- */
+.foto-crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 21500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(11, 43, 30, .55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.foto-crop-overlay.hidden { display: none; }
+
+.foto-crop-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 24px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--ivory);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, .32);
+  animation: gateAppear .22s cubic-bezier(.2,.8,.2,1);
+}
+body.reduz-movimento .foto-crop-card { animation: none; }
+
+.foto-crop-dica { margin: -6px 0 0; font-size: .82rem; color: var(--muted); text-align: center; }
+
+.foto-crop-stage {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 50%;
+  cursor: grab;
+  background: var(--forest-950);
+  border: 3px solid var(--mint-100);
+  box-shadow: 0 0 0 4px rgba(49, 164, 111, .16);
+  touch-action: none;
+}
+.foto-crop-stage:active { cursor: grabbing; }
+.foto-crop-stage img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  max-height: none;
+  transform-origin: 0 0;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.foto-crop-zoom {
+  width: 100%;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.foto-crop-zoom:focus { transform: none; box-shadow: none; border-color: transparent; }
+.foto-crop-zoom::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: var(--mint-100); }
+.foto-crop-zoom::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--emerald-600);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+  cursor: pointer;
+}
+.foto-crop-zoom::-moz-range-track { height: 6px; border-radius: 999px; background: var(--mint-100); }
+.foto-crop-zoom::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--emerald-600);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+  cursor: pointer;
+}
+
+.foto-crop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.foto-crop-actions button { margin: 0; }
+
+@media (max-width: 460px) {
+  .foto-crop-stage { width: 220px; height: 220px; }
+}
+
 /* ---------- Motion: tokens padronizados e feedback de toque (Etapa 7) ----------
    Duração/easing consolidados em variáveis (150-300ms, sempre com uma curva de
    saída suave) para uso em qualquer novo componente. As regras :active abaixo

@@ -256,22 +256,28 @@ appContainer.insertAdjacentHTML("afterbegin", `
   </div>
 `);
 
-document.getElementById("perfilFoto").addEventListener("change", () => {
-  const arquivo = document.getElementById("perfilFoto").files[0];
+/* Foto do perfil: mesma etapa de recorte da criação de conta — a foto
+   inteira aparece para o usuário escolher a parte certa antes de salvar. */
+let perfilFotoRecortada = null;
+
+document.getElementById("perfilFoto").addEventListener("change", async () => {
+  const campo = document.getElementById("perfilFoto");
+  const arquivo = campo.files[0];
   if (!arquivo) return;
   if (!arquivo.type.startsWith("image/")) {
     mfToast("Selecione um arquivo de imagem.");
+    campo.value = "";
     return;
   }
+  const recorte = await mfAbrirCropFoto(arquivo);
+  campo.value = "";
+  if (!recorte) return;
+  perfilFotoRecortada = recorte;
   const preview = document.getElementById("previewPerfil");
   const vazio = document.getElementById("previewPerfilVazio");
-  const leitor = new FileReader();
-  leitor.onload = () => {
-    preview.src = leitor.result;
-    preview.classList.remove("hidden");
-    vazio.classList.add("hidden");
-  };
-  leitor.readAsDataURL(arquivo);
+  preview.src = URL.createObjectURL(recorte);
+  preview.classList.remove("hidden");
+  vazio.classList.add("hidden");
 });
 
 document.getElementById("listaContasAdmin").addEventListener("click", async event => {
@@ -387,6 +393,23 @@ document.body.insertAdjacentHTML("beforeend", `
       <div class="mf-dialog-actions">
         <button type="button" id="mfDialogCancelar" class="secondary">Cancelar</button>
         <button type="button" id="mfDialogConfirmar">Confirmar</button>
+      </div>
+    </div>
+  </div>
+  <div id="fotoCropOverlay" class="foto-crop-overlay hidden" onclick="mfCliqueForaCropFoto(event)">
+    <div class="foto-crop-card" role="dialog" aria-modal="true" aria-labelledby="fotoCropTitulo">
+      <div class="lancamento-modal-header">
+        <h2 id="fotoCropTitulo">Ajuste sua foto</h2>
+        <button type="button" class="lancamento-modal-close" onclick="mfCancelarCropFoto()" aria-label="Fechar">×</button>
+      </div>
+      <p class="foto-crop-dica">Arraste a foto para posicionar e use o controle para dar zoom.</p>
+      <div class="foto-crop-stage" id="fotoCropStage">
+        <img id="fotoCropImagem" alt="" draggable="false" />
+      </div>
+      <input id="fotoCropZoom" type="range" min="100" max="300" value="100" step="1" class="foto-crop-zoom" aria-label="Zoom da foto" />
+      <div class="foto-crop-actions">
+        <button type="button" class="secondary" onclick="mfCancelarCropFoto()">Cancelar</button>
+        <button type="button" onclick="mfConfirmarCropFoto()">Usar esta foto</button>
       </div>
     </div>
   </div>
@@ -510,6 +533,160 @@ function mfConfirm(texto, { titulo = "Confirmar ação", danger = true } = {}) {
 function mfPrompt(texto, { titulo = "Informe um valor", valorInicial = "" } = {}) {
   return mfAbrirDialog({ titulo, texto, tipo: "prompt", danger: false, valorInicial });
 }
+
+/* Recorte de foto: antes de usar qualquer foto (nova conta ou editar perfil),
+   mostra a imagem inteira numa segunda etapa para o usuário arrastar/dar zoom
+   e escolher exatamente a parte que quer usar — em vez de só espremer a foto
+   toda num quadrado, como acontecia antes. mfAbrirCropFoto(arquivo) devolve
+   uma Promise que resolve com um Blob JPEG já recortado (quadrado, pronto
+   para upload) ou null se o usuário cancelar. */
+const MF_CROP_SAIDA = 480; // resolução final do avatar exportado
+let mfCropTamanhoPalco = 260; // lido do tamanho real do palco ao abrir (ver CSS: .foto-crop-stage encolhe em telas pequenas)
+let mfCropResolvedor = null;
+let mfCropUrlAtual = null;
+let mfCropEscalaBase = 1;
+let mfCropEscalaAtual = 1;
+let mfCropDeslocX = 0;
+let mfCropDeslocY = 0;
+let mfCropArrastando = false;
+let mfCropInicioX = 0;
+let mfCropInicioY = 0;
+let mfCropInicioDeslocX = 0;
+let mfCropInicioDeslocY = 0;
+
+function mfAbrirCropFoto(arquivo) {
+  return new Promise(resolve => {
+    mfCropResolvedor = resolve;
+    const overlay = document.getElementById("fotoCropOverlay");
+    const imgEl = document.getElementById("fotoCropImagem");
+    const zoom = document.getElementById("fotoCropZoom");
+    if (!overlay || !imgEl || !zoom) { resolve(null); return; }
+
+    if (mfCropUrlAtual) URL.revokeObjectURL(mfCropUrlAtual);
+    mfCropUrlAtual = URL.createObjectURL(arquivo);
+
+    /* Mostra o palco ANTES de carregar a imagem: precisamos medir o tamanho
+       real dele (getBoundingClientRect) quando a imagem terminar de carregar,
+       e isso só funciona depois que ele deixa de estar "display:none". */
+    overlay.classList.remove("hidden");
+    document.body.classList.add("foto-crop-aberto");
+
+    imgEl.onload = () => {
+      mfCropTamanhoPalco = document.getElementById("fotoCropStage")?.getBoundingClientRect().width || 260;
+      mfCropEscalaBase = mfCropTamanhoPalco / Math.min(imgEl.naturalWidth, imgEl.naturalHeight);
+      mfCropEscalaAtual = mfCropEscalaBase;
+      zoom.value = 100;
+      mfCropDeslocX = (mfCropTamanhoPalco - imgEl.naturalWidth * mfCropEscalaAtual) / 2;
+      mfCropDeslocY = (mfCropTamanhoPalco - imgEl.naturalHeight * mfCropEscalaAtual) / 2;
+      mfAplicarTransformCrop();
+    };
+    imgEl.src = mfCropUrlAtual;
+    mfAplicarOrigemAnimacao(overlay.querySelector(".foto-crop-card"), mfOrigemClique(document.activeElement));
+    document.addEventListener("keydown", mfCropTeclado, true);
+  });
+}
+
+function mfAplicarTransformCrop() {
+  const imgEl = document.getElementById("fotoCropImagem");
+  if (!imgEl.naturalWidth) return;
+  imgEl.style.width = `${imgEl.naturalWidth * mfCropEscalaAtual}px`;
+  imgEl.style.height = `${imgEl.naturalHeight * mfCropEscalaAtual}px`;
+  imgEl.style.transform = `translate(${mfCropDeslocX}px, ${mfCropDeslocY}px)`;
+}
+
+function mfClampCropDesloc() {
+  const imgEl = document.getElementById("fotoCropImagem");
+  const largura = imgEl.naturalWidth * mfCropEscalaAtual;
+  const altura = imgEl.naturalHeight * mfCropEscalaAtual;
+  const minX = Math.min(0, mfCropTamanhoPalco - largura);
+  const minY = Math.min(0, mfCropTamanhoPalco - altura);
+  mfCropDeslocX = Math.max(minX, Math.min(0, mfCropDeslocX));
+  mfCropDeslocY = Math.max(minY, Math.min(0, mfCropDeslocY));
+}
+
+function mfConfirmarCropFoto() {
+  const imgEl = document.getElementById("fotoCropImagem");
+  if (!imgEl.naturalWidth) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = MF_CROP_SAIDA;
+  canvas.height = MF_CROP_SAIDA;
+  const ctx = canvas.getContext("2d");
+  const sx = -mfCropDeslocX / mfCropEscalaAtual;
+  const sy = -mfCropDeslocY / mfCropEscalaAtual;
+  const sTamanho = mfCropTamanhoPalco / mfCropEscalaAtual;
+  ctx.drawImage(imgEl, sx, sy, sTamanho, sTamanho, 0, 0, MF_CROP_SAIDA, MF_CROP_SAIDA);
+  canvas.toBlob(blob => {
+    const resolver = mfCropResolvedor;
+    mfFecharCropFoto();
+    if (resolver) resolver(blob);
+  }, "image/jpeg", 0.85);
+}
+
+function mfCancelarCropFoto() {
+  const resolver = mfCropResolvedor;
+  mfFecharCropFoto();
+  if (resolver) resolver(null);
+}
+
+function mfCliqueForaCropFoto(event) {
+  if (event.target.id === "fotoCropOverlay") mfCancelarCropFoto();
+}
+
+function mfFecharCropFoto() {
+  mfCropResolvedor = null;
+  const overlay = document.getElementById("fotoCropOverlay");
+  overlay.classList.add("hidden");
+  document.body.classList.remove("foto-crop-aberto");
+  document.removeEventListener("keydown", mfCropTeclado, true);
+  if (mfCropUrlAtual) { URL.revokeObjectURL(mfCropUrlAtual); mfCropUrlAtual = null; }
+}
+
+function mfCropTeclado(event) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    mfCancelarCropFoto();
+  }
+}
+
+(function mfConfigurarArrastoCrop() {
+  const palco = document.getElementById("fotoCropStage");
+  const zoom = document.getElementById("fotoCropZoom");
+  if (!palco || !zoom) return;
+
+  palco.addEventListener("pointerdown", event => {
+    if (!document.getElementById("fotoCropImagem").naturalWidth) return;
+    mfCropArrastando = true;
+    mfCropInicioX = event.clientX;
+    mfCropInicioY = event.clientY;
+    mfCropInicioDeslocX = mfCropDeslocX;
+    mfCropInicioDeslocY = mfCropDeslocY;
+    palco.setPointerCapture(event.pointerId);
+  });
+  palco.addEventListener("pointermove", event => {
+    if (!mfCropArrastando) return;
+    mfCropDeslocX = mfCropInicioDeslocX + (event.clientX - mfCropInicioX);
+    mfCropDeslocY = mfCropInicioDeslocY + (event.clientY - mfCropInicioY);
+    mfClampCropDesloc();
+    mfAplicarTransformCrop();
+  });
+  const pararArrasto = () => { mfCropArrastando = false; };
+  palco.addEventListener("pointerup", pararArrasto);
+  palco.addEventListener("pointercancel", pararArrasto);
+  palco.addEventListener("pointerleave", pararArrasto);
+
+  zoom.addEventListener("input", () => {
+    const imgEl = document.getElementById("fotoCropImagem");
+    if (!imgEl.naturalWidth) return;
+    const centro = mfCropTamanhoPalco / 2;
+    const imgX = (centro - mfCropDeslocX) / mfCropEscalaAtual;
+    const imgY = (centro - mfCropDeslocY) / mfCropEscalaAtual;
+    mfCropEscalaAtual = mfCropEscalaBase * (Number(zoom.value) / 100);
+    mfCropDeslocX = centro - imgX * mfCropEscalaAtual;
+    mfCropDeslocY = centro - imgY * mfCropEscalaAtual;
+    mfClampCropDesloc();
+    mfAplicarTransformCrop();
+  });
+})();
 
 /* Cores estáveis por grupo (hash determinístico), com mapeamento
    privilegiado para nomes comuns como Streaming, Estudos, Moradia etc. */
@@ -1081,18 +1258,29 @@ function fecharCriacaoConta() {
   document.getElementById("accountCreate").classList.add("hidden");
   document.getElementById("accountChooser").classList.remove("hidden");
   document.getElementById("createAccountMessage").textContent = "";
+  novaContaFotoRecortada = null;
 }
 
-function mostrarPreviewNovaConta(campo) {
+/* Foto da nova conta: ao escolher um arquivo, abre a etapa de recorte antes
+   de usar a foto — o usuário vê a imagem inteira e escolhe a parte certa em
+   vez de a gente simplesmente espremer a foto toda num quadrado. */
+let novaContaFotoRecortada = null;
+
+async function mostrarPreviewNovaConta(campo) {
   const arquivo = campo.files?.[0];
   const preview = document.getElementById("novaContaFotoPreview");
   const placeholder = document.getElementById("novaContaFotoPlaceholder");
-  if (!arquivo) {
-    preview.classList.add("hidden");
-    placeholder.classList.remove("hidden");
+  if (!arquivo) return;
+  if (!arquivo.type.startsWith("image/")) {
+    campo.value = "";
+    mfToast("Selecione um arquivo de imagem.");
     return;
   }
-  preview.src = URL.createObjectURL(arquivo);
+  const recorte = await mfAbrirCropFoto(arquivo);
+  campo.value = "";
+  if (!recorte) return;
+  novaContaFotoRecortada = recorte;
+  preview.src = URL.createObjectURL(recorte);
   preview.classList.remove("hidden");
   placeholder.classList.add("hidden");
 }
@@ -1103,14 +1291,12 @@ async function criarContaPorPerfil() {
   const nome = [primeiroNome, sobrenome].filter(Boolean).join(" ");
   const pin = document.getElementById("novaContaPin").value;
   const confirmacao = document.getElementById("novaContaPinConfirmacao").value;
-  const foto = document.getElementById("novaContaFoto").files?.[0];
   const mensagem = document.getElementById("createAccountMessage");
   const botao = document.getElementById("botaoCriarConta");
 
   if (primeiroNome.length < 2) return mensagem.textContent = "Digite seu nome.";
   if (!/^\d{4,8}$/.test(pin)) return mensagem.textContent = "Crie uma senha com 4 a 8 números.";
   if (pin !== confirmacao) return mensagem.textContent = "As duas senhas precisam ser iguais.";
-  if (foto && !foto.type.startsWith("image/")) return mensagem.textContent = "Escolha uma foto válida.";
 
   botao.disabled = true;
   mensagem.textContent = "Criando seu perfil…";
@@ -1125,13 +1311,12 @@ async function criarContaPorPerfil() {
 
     usuarioAtual = autenticacao.user;
     let avatarUrl = "";
-    if (foto) {
+    if (novaContaFotoRecortada) {
       try {
         mensagem.textContent = "Preparando sua foto…";
-        const imagem = await prepararImagemPerfil(foto);
         const caminho = `${usuarioAtual.id}/avatar.jpg`;
         const { error: erroUpload } = await supabaseClient.storage.from("avatars")
-          .upload(caminho, imagem, { contentType: "image/jpeg", upsert: true });
+          .upload(caminho, novaContaFotoRecortada, { contentType: "image/jpeg", upsert: true });
         if (erroUpload) throw erroUpload;
         const { data: urlPublica } = supabaseClient.storage.from("avatars").getPublicUrl(caminho);
         avatarUrl = `${urlPublica.publicUrl}?v=${Date.now()}`;
@@ -1153,6 +1338,7 @@ async function criarContaPorPerfil() {
     document.getElementById("novaContaFoto").value = "";
     document.getElementById("novaContaFotoPreview").classList.add("hidden");
     document.getElementById("novaContaFotoPlaceholder").classList.remove("hidden");
+    novaContaFotoRecortada = null;
     fecharCriacaoConta();
     await carregarContasDoDispositivo();
   } catch (error) {
@@ -3055,6 +3241,7 @@ function abrirPerfil() {
   document.getElementById("perfilNovoPin").value = "";
   document.getElementById("perfilConfirmarPin").value = "";
   document.getElementById("perfilFoto").value = "";
+  perfilFotoRecortada = null;
 
   const preview = document.getElementById("previewPerfil");
   const vazio = document.getElementById("previewPerfilVazio");
@@ -3099,19 +3286,12 @@ async function salvarPerfil() {
   }
 
   let avatarUrl = perfilAtual?.avatar_url || "";
-  const foto = document.getElementById("perfilFoto").files[0];
 
-  if (foto) {
-    if (!foto.type.startsWith("image/")) {
-      mfToast("Selecione um arquivo de imagem.");
-      return;
-    }
-
-    const imagem = await prepararImagemPerfil(foto);
+  if (perfilFotoRecortada) {
     const caminho = `${usuarioAtual.id}/avatar.jpg`;
     const { error: uploadError } = await supabaseClient.storage
       .from("avatars")
-      .upload(caminho, imagem, { contentType: "image/jpeg", upsert: true });
+      .upload(caminho, perfilFotoRecortada, { contentType: "image/jpeg", upsert: true });
 
     if (uploadError) {
       mfToast(mensagemErro(uploadError, "Não foi possível enviar a foto."));
@@ -3122,6 +3302,7 @@ async function salvarPerfil() {
       .from("avatars")
       .getPublicUrl(caminho);
     avatarUrl = `${publicUrlData.publicUrl}?v=${Date.now()}`;
+    perfilFotoRecortada = null;
   }
 
   const dados = {
