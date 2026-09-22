@@ -5,12 +5,24 @@ import webpush from "npm:web-push@3.6.7";
 // Checa vencimentos de contas fixas e faturas de cartão e envia notificação
 // Web Push (funciona mesmo com o app fechado) para quem ativou o aviso.
 // Não é chamada pelo próprio app: é chamada de fora, duas vezes por dia
-// (manhã e noite), por um agendador externo — ver README do projeto.
+// (manhã e noite), por um agendador externo (pg_cron, ver migração
+// agendamento_notificacoes) — ver README do projeto.
 //
-// Regra de disparo, por perfil (perfis.notificar_antecedencia_dias = N):
-//   - Toda manhã: avisa qualquer conta/fatura com 0 a N dias até o vencimento.
-//   - Toda noite: avisa só o que vence hoje ou amanhã (0 ou 1 dia) — reforço
-//     extra perto do prazo, além do aviso da manhã.
+// Régua de avisos, por perfil (perfis.notificar_antecedencia_dias = 1, 3 ou
+// 5 escolhe a partir de quantos dias antes começar a avisar):
+//   - Checkpoints fixos: 5, 3 e 1 dia(s) antes e no dia do vencimento — só os
+//     que estiverem dentro da antecedência escolhida.
+//   - Vencida: todo dia, sem parar, enquanto não for marcada como paga —
+//     isso NÃO depende da antecedência escolhida.
+//   - Toda manhã: avisa tudo que bateu em algum checkpoint hoje.
+//   - Toda noite: reforço extra só do que vence hoje/amanhã ou já venceu.
+//
+// Conta fixa vinculada a um cartão (paga "no cartão" em vez de em dinheiro):
+// os avisos de 5/3/1 dia antes são iguais aos de qualquer conta. No dia do
+// vencimento, em vez do aviso genérico, avisa que o valor vai entrar na
+// fatura do cartão — e SÓ continua cobrando (aviso de "vencida" todo dia)
+// se o cartão não tiver limite suficiente pra cobrir (mesma regra que a aba
+// Cartões usa pra decidir "No cartão" vs "Vencida").
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,6 +53,41 @@ function proximoVencimentoCartao(diaVencimento: number, hoje: Date): string {
     candidato = new Date(ano, mes + 1, Math.min(diaVencimento, ultimoDiaProximoMes));
   }
   return candidato.toISOString().slice(0, 10);
+}
+
+type ContaFixa = { id: number; nome: string; valor: number; vencimento: string; cartao_id: number | null };
+type Cartao = { id: number; nome: string; dia_vencimento: number; limite: number | null };
+type Parcela = { cartao_id: number | null; valor_total: number; total_parcelas: number; parcelas_pagas: number };
+
+// Mesma conta de "limite usado" que a aba Cartões faz no app (calcularUsoCartoes
+// em script.js), pra bater exatamente com o que a pessoa vê na tela: soma das
+// contas fixas vinculadas que já venceram (entraram na fatura atual) + o que
+// falta pagar das compras parceladas daquele cartão.
+function calcularUsoPorCartao(cartoes: Cartao[], contasFixas: ContaFixa[], parcelas: Parcela[], hojeISO: string) {
+  const mapa = new Map<number, { usoTotal: number; temLimite: boolean; limite: number | null; estourado: boolean }>();
+
+  for (const cartao of cartoes) {
+    const totalContasNaFaturaAtual = contasFixas
+      .filter(conta => conta.cartao_id === cartao.id && conta.vencimento <= hojeISO)
+      .reduce((total, conta) => total + Number(conta.valor), 0);
+
+    const totalParcelasAberto = parcelas
+      .filter(item => item.cartao_id === cartao.id && Number(item.parcelas_pagas) < Number(item.total_parcelas))
+      .reduce((total, item) => {
+        const valorParcela = Number(item.valor_total) / Number(item.total_parcelas);
+        const restantes = Number(item.total_parcelas) - Number(item.parcelas_pagas);
+        return total + valorParcela * restantes;
+      }, 0);
+
+    const usoTotal = totalContasNaFaturaAtual + totalParcelasAberto;
+    const temLimite = cartao.limite !== null && cartao.limite !== undefined;
+    const limite = temLimite ? Number(cartao.limite) : null;
+    const estourado = temLimite && usoTotal > (limite as number);
+
+    mapa.set(cartao.id, { usoTotal, temLimite, limite, estourado });
+  }
+
+  return mapa;
 }
 
 Deno.serve(async request => {
@@ -90,22 +137,65 @@ Deno.serve(async request => {
 
   for (const perfil of perfis || []) {
     const antecedencia = Number(perfil.notificar_antecedencia_dias) || 3;
+    const checkpoints = [5, 3, 1, 0].filter(dias => dias <= antecedencia);
 
-    const [{ data: contas }, { data: cartoes }] = await Promise.all([
-      admin.from("contas_fixas").select("nome, vencimento").eq("user_id", perfil.user_id),
-      admin.from("cartoes").select("nome, dia_vencimento").eq("user_id", perfil.user_id),
+    const [{ data: contasFixasRaw }, { data: cartoesRaw }, { data: parcelasRaw }] = await Promise.all([
+      admin.from("contas_fixas").select("id, nome, valor, vencimento, cartao_id").eq("user_id", perfil.user_id),
+      admin.from("cartoes").select("id, nome, dia_vencimento, limite").eq("user_id", perfil.user_id),
+      admin.from("cartoes_parcelas").select("cartao_id, valor_total, total_parcelas, parcelas_pagas").eq("user_id", perfil.user_id),
     ]);
+
+    const contasFixas = (contasFixasRaw || []) as ContaFixa[];
+    const cartoes = (cartoesRaw || []) as Cartao[];
+    const parcelas = (parcelasRaw || []) as Parcela[];
+    const usoPorCartao = calcularUsoPorCartao(cartoes, contasFixas, parcelas, hojeISO);
 
     const itens: { nome: string; dias: number }[] = [];
 
-    for (const conta of contas || []) {
+    for (const conta of contasFixas) {
       const dias = diasAte(conta.vencimento, hojeISO);
-      if (dias >= 0 && dias <= antecedencia) itens.push({ nome: conta.nome, dias });
+      const cartaoVinculado = conta.cartao_id ? cartoes.find(c => c.id === conta.cartao_id) : null;
+
+      if (dias > 0) {
+        // Antes do vencimento: mesma régua de checkpoints pra todas as
+        // contas, tenham cartão vinculado ou não.
+        if (checkpoints.includes(dias)) itens.push({ nome: conta.nome, dias });
+        continue;
+      }
+
+      if (dias === 0) {
+        if (!checkpoints.includes(0)) continue;
+        if (!cartaoVinculado) {
+          itens.push({ nome: conta.nome, dias: 0 });
+          continue;
+        }
+        const uso = usoPorCartao.get(cartaoVinculado.id);
+        if (!uso || !uso.temLimite || uso.estourado) {
+          itens.push({ nome: `${conta.nome} (cartão ${cartaoVinculado.nome} — confira o limite)`, dias: 0 });
+        } else {
+          itens.push({ nome: `${conta.nome} (cobrado no cartão ${cartaoVinculado.nome} hoje)`, dias: 0 });
+        }
+        continue;
+      }
+
+      // dias < 0: vencida. Sem cartão, avisa todo dia até ser paga. Com
+      // cartão, só continua avisando se o cartão não tiver limite pra cobrir
+      // (senão o valor já foi absorvido pela fatura, mesma regra da aba
+      // Cartões).
+      if (!cartaoVinculado) {
+        itens.push({ nome: conta.nome, dias });
+        continue;
+      }
+      const uso = usoPorCartao.get(cartaoVinculado.id);
+      if (!uso || !uso.temLimite || uso.estourado) {
+        itens.push({ nome: `${conta.nome} (cartão ${cartaoVinculado.nome} sem limite pra cobrir)`, dias });
+      }
     }
-    for (const cartao of cartoes || []) {
+
+    for (const cartao of cartoes) {
       const proxima = proximoVencimentoCartao(Number(cartao.dia_vencimento), agora);
       const dias = diasAte(proxima, hojeISO);
-      if (dias >= 0 && dias <= antecedencia) itens.push({ nome: `Fatura ${cartao.nome}`, dias });
+      if (checkpoints.includes(dias)) itens.push({ nome: `Fatura ${cartao.nome}`, dias });
     }
 
     const itensDoEnvio = periodo === "noite" ? itens.filter(item => item.dias <= 1) : itens;
@@ -118,11 +208,16 @@ Deno.serve(async request => {
     if (!assinaturas || !assinaturas.length) continue;
 
     itensDoEnvio.sort((a, b) => a.dias - b.dias);
+    const rotuloDias = (dias: number) => dias < 0
+      ? "vencida"
+      : dias === 0
+        ? "vence hoje"
+        : `vence em ${dias} dia(s)`;
     const titulo = itensDoEnvio.length === 1
-      ? `${itensDoEnvio[0].nome} ${itensDoEnvio[0].dias === 0 ? "vence hoje" : `vence em ${itensDoEnvio[0].dias} dia(s)`}`
-      : `${itensDoEnvio.length} vencimentos próximos`;
+      ? `${itensDoEnvio[0].nome} ${rotuloDias(itensDoEnvio[0].dias)}`
+      : `${itensDoEnvio.length} avisos de vencimento`;
     const corpo = itensDoEnvio
-      .map(item => `${item.nome} — ${item.dias === 0 ? "hoje" : `em ${item.dias} dia(s)`}`)
+      .map(item => `${item.nome} — ${rotuloDias(item.dias)}`)
       .join(" · ");
 
     const payload = JSON.stringify({ title: titulo, body: corpo });
