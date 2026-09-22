@@ -1913,7 +1913,7 @@ form.addEventListener("submit", async function(e) {
   } else {
     const { error } = await supabaseClient
       .from("lancamentos")
-      .insert([novo]);
+      .insert([{ ...novo, dispositivo_origem: await obterEndpointPushAtual() }]);
 
     if (error) {
       mfToast("Erro ao adicionar lançamento.");
@@ -3021,6 +3021,7 @@ async function importarDados(event) {
     }
     const idGrupoPorNome = new Map(gruposDisponiveis.map(grupo => [grupo.nome.trim().toLocaleLowerCase("pt-BR"), grupo.id]));
 
+    const dispositivoOrigemAtual = await obterEndpointPushAtual();
     const novosLancamentos = dados.lancamentos.map(({ tipo, categoria, descricao, valor, data, origem, origem_id }) => ({
       tipo,
       categoria,
@@ -3029,7 +3030,8 @@ async function importarDados(event) {
       data,
       origem: origem || null,
       origem_id: origem_id || null,
-      user_id: usuarioAtual.id
+      user_id: usuarioAtual.id,
+      dispositivo_origem: dispositivoOrigemAtual
     }));
 
     const novasContas = dados.contasFixas.map(item => ({
@@ -3369,6 +3371,23 @@ function urlBase64ParaUint8Array(base64String) {
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const dadosBrutos = atob(base64);
   return Uint8Array.from([...dadosBrutos].map(caractere => caractere.charCodeAt(0)));
+}
+
+// Endpoint da assinatura de push DESTE aparelho, se as notificações já
+// estiverem ativadas nele — sem pedir permissão nem criar assinatura nova.
+// Usado pra marcar de qual aparelho um lançamento saiu, e assim o aviso de
+// "novo lançamento" consegue avisar os OUTROS aparelhos (inclusive os da
+// mesma conta) sem ecoar de volta pra quem acabou de lançar.
+async function obterEndpointPushAtual() {
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) return null;
+    const assinatura = await registration.pushManager.getSubscription();
+    return assinatura ? assinatura.endpoint : null;
+  } catch {
+    return null;
+  }
 }
 
 async function ativarNotificacoes() {

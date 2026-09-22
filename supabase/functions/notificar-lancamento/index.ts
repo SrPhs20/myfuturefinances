@@ -2,12 +2,16 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
-// Avisa (Web Push) TODAS as outras contas do aplicativo sempre que uma conta
-// cria um novo lançamento — é um aviso geral entre amigos: quem lançou não
-// recebe o próprio aviso, mas qualquer outra conta com notificações ativadas
-// recebe, com o nome de quem lançou, categoria, descrição e valor. Chamada
-// automaticamente por um trigger no banco (ver migração
-// notificar_lancamentos_grupo), nunca direto pelo app.
+// Avisa (Web Push) todos os OUTROS dispositivos com notificações ativadas
+// sempre que uma conta cria um novo lançamento — geral entre amigos (cada
+// amigo com a própria conta) e também entre os vários aparelhos de uma
+// MESMA conta (ex.: celular e computador do mesmo usuário, como em apps que
+// sincronizam notificações entre aparelhos). Só o aparelho que efetivamente
+// fez o lançamento fica de fora — ele já sabe o que acabou de fazer; os
+// demais recebem com o nome de quem lançou, categoria, descrição e valor.
+// Chamada automaticamente por um trigger no banco (ver migração
+// notificar_lancamentos_grupo / notificacao_por_dispositivo), nunca direto
+// pelo app.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,19 +59,22 @@ Deno.serve(async request => {
     return json({ ok: false, mensagem: "Corpo invalido." }, 400);
   }
 
-  const autorUserId = String(corpo?.autor_user_id || "");
   const autorNome = String(corpo?.autor_nome || "").trim() || "Alguém";
   const quantidade = Number(corpo?.quantidade) || 1;
-  if (!autorUserId) return json({ ok: false, mensagem: "autor_user_id ausente." }, 400);
+  const origemEndpoints = Array.isArray(corpo?.origem_endpoints)
+    ? (corpo.origem_endpoints as unknown[]).filter((item): item is string => typeof item === "string" && item.length > 0)
+    : [];
 
-  // Todas as contas do app com notificações ativadas, EXCETO a de quem
-  // acabou de lançar (ela não precisa de aviso do próprio lançamento).
-  const { data: assinaturas, error: erroAssinaturas } = await admin
+  // Todos os dispositivos com notificações ativadas, de qualquer conta,
+  // EXCETO o(s) que efetivamente fez(fizeram) este lançamento — assim os
+  // outros aparelhos da MESMA conta, e todas as OUTRAS contas, recebem.
+  const { data: todasAssinaturas, error: erroAssinaturas } = await admin
     .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth")
-    .neq("user_id", autorUserId);
+    .select("id, endpoint, p256dh, auth");
   if (erroAssinaturas) return json({ ok: false, mensagem: erroAssinaturas.message }, 500);
-  if (!assinaturas || !assinaturas.length) return json({ ok: true, notificacoesEnviadas: 0 });
+
+  const assinaturas = (todasAssinaturas || []).filter(item => !origemEndpoints.includes(item.endpoint));
+  if (!assinaturas.length) return json({ ok: true, notificacoesEnviadas: 0 });
 
   let titulo: string;
   let mensagem: string;
