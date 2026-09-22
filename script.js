@@ -214,6 +214,7 @@ appContainer.insertAdjacentHTML("afterbegin", `
         <p>Receba um aviso quando uma conta fixa ou a fatura de um cartão estiver perto de vencer — funciona mesmo com o app fechado.</p>
         <button type="button" id="botaoAtivarNotificacoes" onclick="ativarNotificacoes()">Ativar notificações</button>
         <button type="button" class="secondary hidden" id="botaoDesativarNotificacoes" onclick="desativarNotificacoes()">Desativar notificações</button>
+        <p id="avisoNotificacaoOutroAparelho" class="notification-settings-aviso hidden">Notificações já ligadas na sua conta — mas cada aparelho precisa ativar por conta própria. Clique em "Ativar notificações" aqui também pra este aparelho receber os avisos.</p>
         <div id="blocoAntecedenciaNotificacao" class="notification-settings-antecedencia hidden">
           <label for="notificacaoAntecedencia">Avisar com quantos dias de antecedência?</label>
           <select id="notificacaoAntecedencia" onchange="salvarAntecedenciaNotificacao(this)">
@@ -3443,6 +3444,24 @@ async function ativarNotificacoes() {
 }
 
 async function desativarNotificacoes() {
+  // Tira a assinatura de push DESTE aparelho também — senão ele continua
+  // recebendo os avisos de novo lançamento (que olham só push_subscriptions,
+  // não essa preferência da conta) mesmo depois de "desativado".
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    const assinatura = registration ? await registration.pushManager.getSubscription() : null;
+    if (assinatura) {
+      await supabaseClient
+        .from("push_subscriptions")
+        .delete()
+        .eq("user_id", usuarioAtual.id)
+        .eq("endpoint", assinatura.endpoint);
+      await assinatura.unsubscribe();
+    }
+  } catch {
+    // Segue mesmo se não der pra limpar a assinatura deste aparelho.
+  }
+
   const { error } = await supabaseClient
     .from("perfis")
     .update({ notificar_vencimentos: false })
@@ -3475,16 +3494,25 @@ async function salvarAntecedenciaNotificacao(seletor) {
   mfToast("Antecedência de aviso atualizada.");
 }
 
-function atualizarPainelNotificacoes() {
+async function atualizarPainelNotificacoes() {
   const ativado = !!perfilAtual?.notificar_vencimentos;
   const botaoAtivar = document.getElementById("botaoAtivarNotificacoes");
   const botaoDesativar = document.getElementById("botaoDesativarNotificacoes");
   const blocoAntecedencia = document.getElementById("blocoAntecedenciaNotificacao");
   const seletorAntecedencia = document.getElementById("notificacaoAntecedencia");
+  const avisoOutroAparelho = document.getElementById("avisoNotificacaoOutroAparelho");
 
-  if (botaoAtivar) botaoAtivar.classList.toggle("hidden", ativado);
-  if (botaoDesativar) botaoDesativar.classList.toggle("hidden", !ativado);
+  // "notificar_vencimentos" é uma preferência da CONTA (vale pra todo mundo
+  // que usa esse perfil), mas quem realmente recebe o push é o APARELHO que
+  // tiver a própria assinatura salva em push_subscriptions. Por isso o botão
+  // "Ativar" não pode se basear só na preferência da conta — senão, se ela já
+  // foi ligada em outro aparelho, este aqui nunca chega a se inscrever.
+  const dispositivoInscrito = !!(await obterEndpointPushAtual());
+
+  if (botaoAtivar) botaoAtivar.classList.toggle("hidden", dispositivoInscrito);
+  if (botaoDesativar) botaoDesativar.classList.toggle("hidden", !dispositivoInscrito);
   if (blocoAntecedencia) blocoAntecedencia.classList.toggle("hidden", !ativado);
+  if (avisoOutroAparelho) avisoOutroAparelho.classList.toggle("hidden", !(ativado && !dispositivoInscrito));
   if (seletorAntecedencia) {
     seletorAntecedencia.value = String(perfilAtual?.notificar_antecedencia_dias || 3);
     mfAtualizarSelectRealcado("notificacaoAntecedencia");

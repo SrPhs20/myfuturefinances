@@ -2136,6 +2136,7 @@ body.reduz-movimento .cartao-visual-inner { transition: none; }
 .profile-pin-settings #botaoAtivarNotificacoes, .profile-pin-settings #botaoDesativarNotificacoes { margin-top: 4px; }
 .notification-settings-antecedencia { margin-top: 10px; }
 .notification-settings-antecedencia label { display: block; margin: 0 0 4px; }
+.notification-settings-aviso { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: rgba(217, 164, 6, .14); border: 1px solid rgba(217, 164, 6, .35); color: var(--forest-900); font-size: .74rem; line-height: 1.4; }
 
 .profile-gate.pin-error .gate-avatar-button { animation: pinShake .38s ease; }
 .profile-gate.unlocking > *:not(.gate-avatar-button) { animation: gateFade .2s ease forwards; }
