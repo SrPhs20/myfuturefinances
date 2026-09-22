@@ -2,10 +2,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
-// Avisa (Web Push) todos os dispositivos inscritos num perfil sempre que um
-// novo lançamento é criado nele — como um mesmo perfil pode ser acessado por
-// vários amigos que sabem o PIN, isso funciona como um aviso pro grupo
-// inteiro. Chamada automaticamente por um trigger no banco (ver migração
+// Avisa (Web Push) TODAS as outras contas do aplicativo sempre que uma conta
+// cria um novo lançamento — é um aviso geral entre amigos: quem lançou não
+// recebe o próprio aviso, mas qualquer outra conta com notificações ativadas
+// recebe, com o nome de quem lançou, categoria, descrição e valor. Chamada
+// automaticamente por um trigger no banco (ver migração
 // notificar_lancamentos_grupo), nunca direto pelo app.
 
 const corsHeaders = {
@@ -54,14 +55,17 @@ Deno.serve(async request => {
     return json({ ok: false, mensagem: "Corpo invalido." }, 400);
   }
 
-  const userId = String(corpo?.user_id || "");
+  const autorUserId = String(corpo?.autor_user_id || "");
+  const autorNome = String(corpo?.autor_nome || "").trim() || "Alguém";
   const quantidade = Number(corpo?.quantidade) || 1;
-  if (!userId) return json({ ok: false, mensagem: "user_id ausente." }, 400);
+  if (!autorUserId) return json({ ok: false, mensagem: "autor_user_id ausente." }, 400);
 
+  // Todas as contas do app com notificações ativadas, EXCETO a de quem
+  // acabou de lançar (ela não precisa de aviso do próprio lançamento).
   const { data: assinaturas, error: erroAssinaturas } = await admin
     .from("push_subscriptions")
     .select("id, endpoint, p256dh, auth")
-    .eq("user_id", userId);
+    .neq("user_id", autorUserId);
   if (erroAssinaturas) return json({ ok: false, mensagem: erroAssinaturas.message }, 500);
   if (!assinaturas || !assinaturas.length) return json({ ok: true, notificacoesEnviadas: 0 });
 
@@ -69,15 +73,15 @@ Deno.serve(async request => {
   let mensagem: string;
 
   if (quantidade > 1) {
-    titulo = "📋 Vários lançamentos novos";
-    mensagem = `${quantidade} lançamentos foram adicionados de uma vez. Dá uma conferida no app.`;
+    titulo = `📋 ${autorNome} mexeu no app`;
+    mensagem = `${autorNome} adicionou ${quantidade} lançamentos novos de uma vez.`;
   } else {
     const tipo = String(corpo?.tipo || "despesa");
     const categoria = String(corpo?.categoria || "Sem categoria");
     const descricao = String(corpo?.descricao || "").trim();
     const valor = Number(corpo?.valor) || 0;
 
-    titulo = tipo === "receita" ? "💰 Chegou dinheiro novo" : "💸 Rolou um gasto novo";
+    titulo = tipo === "receita" ? `💰 ${autorNome} recebeu uma receita` : `💸 ${autorNome} fez um gasto novo`;
     mensagem = `${formatarMoeda(valor)} em ${categoria}${descricao ? ` — ${descricao}` : ""}`;
   }
 
