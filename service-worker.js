@@ -1,5 +1,5 @@
-const CACHE_NAME = "my-future-finances-v51";
-const APP_SHELL = ["/", "/index.html", "/style.css?v=45", "/script.js?v=44", "/manifest.json", "/favicon.ico", "/apple-touch-icon.png", "/icon-32.png", "/icon-192.png", "/icon-512.png"];
+const CACHE_NAME = "my-future-finances-v52";
+const APP_SHELL = ["/", "/index.html", "/style.css?v=45", "/script.js?v=44", "/manifest.json", "/favicon.ico", "/apple-touch-icon.png", "/icon-32.png", "/icon-192.png", "/icon-512.png", "/icon-badge.png"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
@@ -68,7 +68,7 @@ self.addEventListener("push", event => {
     self.registration.showNotification(dados.title, {
       body: dados.body,
       icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      badge: "/icon-badge.png",
       tag: "mf-vencimento",
       renotify: true
     })
