@@ -2,16 +2,16 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
-// Avisa (Web Push) todos os OUTROS dispositivos com notificações ativadas
-// sempre que uma conta cria um novo lançamento — geral entre amigos (cada
-// amigo com a própria conta) e também entre os vários aparelhos de uma
-// MESMA conta (ex.: celular e computador do mesmo usuário, como em apps que
-// sincronizam notificações entre aparelhos). Só o aparelho que efetivamente
-// fez o lançamento fica de fora — ele já sabe o que acabou de fazer; os
-// demais recebem com o nome de quem lançou, categoria, descrição e valor.
-// Chamada automaticamente por um trigger no banco (ver migração
-// notificar_lancamentos_grupo / notificacao_por_dispositivo), nunca direto
-// pelo app.
+// Avisa (Web Push + caixa de notificações dentro do app) todos os OUTROS
+// dispositivos/contas com notificações ativadas sempre que uma conta cria um
+// novo lançamento — geral entre amigos (cada amigo com a própria conta) e
+// também entre os vários aparelhos de uma MESMA conta (ex.: celular e
+// computador do mesmo usuário, como em apps que sincronizam notificações
+// entre aparelhos). Só o aparelho que efetivamente fez o lançamento fica de
+// fora — ele já sabe o que acabou de fazer; os demais recebem com o nome de
+// quem lançou, categoria, descrição e valor. Chamada automaticamente por um
+// trigger no banco (ver migração notificar_lancamentos_grupo /
+// notificacao_por_dispositivo), nunca direto pelo app.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,7 +70,7 @@ Deno.serve(async request => {
   // outros aparelhos da MESMA conta, e todas as OUTRAS contas, recebem.
   const { data: todasAssinaturas, error: erroAssinaturas } = await admin
     .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth");
+    .select("id, user_id, endpoint, p256dh, auth");
   if (erroAssinaturas) return json({ ok: false, mensagem: erroAssinaturas.message }, 500);
 
   const assinaturas = (todasAssinaturas || []).filter(item => !origemEndpoints.includes(item.endpoint));
@@ -90,6 +90,18 @@ Deno.serve(async request => {
 
     titulo = tipo === "receita" ? `💰 ${autorNome} recebeu uma receita` : `💸 ${autorNome} fez um gasto novo`;
     mensagem = `${formatarMoeda(valor)} em ${categoria}${descricao ? ` — ${descricao}` : ""}`;
+  }
+
+  // Caixa de notificações dentro do app: uma linha por CONTA destinatária
+  // (não por aparelho), pra quem abrir o app ver o aviso mesmo se o push não
+  // chegou nesse aparelho específico (ex.: celular com o app fechado e sem
+  // permissão do sistema pra acordar em segundo plano).
+  const destinatarios = [...new Set(assinaturas.map(item => item.user_id).filter(Boolean))];
+  if (destinatarios.length) {
+    const { error: erroNotificacoes } = await admin.from("notificacoes").insert(
+      destinatarios.map(userId => ({ user_id: userId, titulo, corpo: mensagem, tipo: "lancamento" }))
+    );
+    if (erroNotificacoes) console.error("Falha ao registrar notificacao na caixa do app:", erroNotificacoes);
   }
 
   const payload = JSON.stringify({ title: titulo, body: mensagem });

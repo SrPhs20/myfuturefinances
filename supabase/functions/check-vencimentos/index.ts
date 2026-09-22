@@ -201,12 +201,6 @@ Deno.serve(async request => {
     const itensDoEnvio = periodo === "noite" ? itens.filter(item => item.dias <= 1) : itens;
     if (!itensDoEnvio.length) continue;
 
-    const { data: assinaturas } = await admin
-      .from("push_subscriptions")
-      .select("id, endpoint, p256dh, auth")
-      .eq("user_id", perfil.user_id);
-    if (!assinaturas || !assinaturas.length) continue;
-
     itensDoEnvio.sort((a, b) => a.dias - b.dias);
     const rotuloDias = (dias: number) => dias < 0
       ? "vencida"
@@ -219,6 +213,24 @@ Deno.serve(async request => {
     const corpo = itensDoEnvio
       .map(item => `${item.nome} — ${rotuloDias(item.dias)}`)
       .join(" · ");
+
+    // Caixa de notificações dentro do app: registra pra esse perfil mesmo que
+    // ele não tenha (ou não tenha mais) nenhuma assinatura de push válida —
+    // assim, quando a pessoa abrir o app, ela vê o aviso de qualquer jeito,
+    // mesmo que o push não tenha chegado nesse aparelho.
+    const { error: erroNotificacao } = await admin.from("notificacoes").insert({
+      user_id: perfil.user_id,
+      titulo,
+      corpo,
+      tipo: "vencimento",
+    });
+    if (erroNotificacao) console.error("Falha ao registrar notificacao na caixa do app:", erroNotificacao);
+
+    const { data: assinaturas } = await admin
+      .from("push_subscriptions")
+      .select("id, endpoint, p256dh, auth")
+      .eq("user_id", perfil.user_id);
+    if (!assinaturas || !assinaturas.length) continue;
 
     const payload = JSON.stringify({ title: titulo, body: corpo });
     let avisouEsteperfil = false;

@@ -150,9 +150,28 @@ appContainer.insertAdjacentHTML("afterbegin", `
       </div>
     </div>
 
-    <button type="button" class="menu-glass-trigger" id="botaoMenuGlass" onclick="abrirMenuGlass()" aria-haspopup="true" aria-expanded="false" aria-controls="menuGlassPanel" aria-label="Abrir menu">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>
-    </button>
+    <div class="user-bar-actions">
+      <button type="button" class="notif-bell-trigger" id="botaoNotificacoes" onclick="abrirNotificacoes()" aria-haspopup="true" aria-expanded="false" aria-controls="notificacoesPanel" aria-label="Notificações">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 10.5a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 14.5 6 10.5z" stroke-linejoin="round"/><path d="M10 19a2.2 2.2 0 0 0 4 0" stroke-linecap="round"/></svg>
+        <span id="notificacoesBadge" class="notif-badge hidden">0</span>
+      </button>
+
+      <button type="button" class="menu-glass-trigger" id="botaoMenuGlass" onclick="abrirMenuGlass()" aria-haspopup="true" aria-expanded="false" aria-controls="menuGlassPanel" aria-label="Abrir menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="notificacoesOverlay" class="menu-glass-overlay hidden" onclick="mfCliqueForaNotificacoes(event)">
+    <div id="notificacoesPanel" class="notificacoes-panel" role="dialog" aria-label="Notificações">
+      <div class="menu-glass-header">
+        <span>Notificações</span>
+        <button type="button" class="menu-glass-close" onclick="fecharNotificacoes()" aria-label="Fechar notificações">×</button>
+      </div>
+      <div id="notificacoesLista" class="notificacoes-lista">
+        <p class="notificacoes-vazio">Nenhuma notificação por enquanto.</p>
+      </div>
+    </div>
   </div>
 
   <div id="menuGlassOverlay" class="menu-glass-overlay hidden" onclick="mfCliqueForaMenuGlass(event)">
@@ -1621,6 +1640,7 @@ async function iniciarApp({ bloquear = true } = {}) {
 
     await carregarPerfil();
     await carregarDados();
+    carregarNotificacoes();
 
     configurarCalendarios();
     atualizarTudo();
@@ -3232,6 +3252,127 @@ document.addEventListener("keydown", event => {
   if (event.key !== "Escape") return;
   const overlay = document.getElementById("menuGlassOverlay");
   if (overlay && !overlay.classList.contains("hidden")) fecharMenuGlass();
+});
+
+/* Caixa de notificações dentro do app: complementa o push (que depende do
+   sistema acordar o navegador — em alguns celulares isso é bloqueado por
+   economia de bateria enquanto o app está totalmente fechado). As Edge
+   Functions notificar-lancamento e check-vencimentos gravam uma linha por
+   destinatário na tabela "notificacoes"; aqui só carregamos e exibimos. */
+let notificacoes = [];
+
+async function carregarNotificacoes() {
+  if (!usuarioAtual) return;
+
+  const { data, error } = await supabaseClient
+    .from("notificacoes")
+    .select("id, titulo, corpo, tipo, lida, created_at")
+    .eq("user_id", usuarioAtual.id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Falha ao carregar notificações:", error);
+    return;
+  }
+
+  notificacoes = data || [];
+  atualizarBadgeNotificacoes();
+}
+
+function atualizarBadgeNotificacoes() {
+  const badge = document.getElementById("notificacoesBadge");
+  if (!badge) return;
+  const naoLidas = notificacoes.filter(item => !item.lida).length;
+  badge.textContent = naoLidas > 9 ? "9+" : String(naoLidas);
+  badge.classList.toggle("hidden", naoLidas === 0);
+}
+
+function mfTempoRelativo(dataISO) {
+  const diffMs = Date.now() - new Date(dataISO).getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 1) return "agora";
+  if (diffMin < 60) return `há ${diffMin} min`;
+  const diffHoras = Math.round(diffMin / 60);
+  if (diffHoras < 24) return `há ${diffHoras} h`;
+  const diffDias = Math.round(diffHoras / 24);
+  if (diffDias === 1) return "ontem";
+  if (diffDias < 7) return `há ${diffDias} dias`;
+  return formatarData(dataISO.slice(0, 10));
+}
+
+const ICONE_POR_TIPO_NOTIFICACAO = { lancamento: "💸", vencimento: "⏰", geral: "🔔" };
+
+function renderizarNotificacoes() {
+  const lista = document.getElementById("notificacoesLista");
+  if (!lista) return;
+
+  if (!notificacoes.length) {
+    lista.innerHTML = `<p class="notificacoes-vazio">Nenhuma notificação por enquanto.</p>`;
+    return;
+  }
+
+  lista.innerHTML = notificacoes.map(item => `
+    <div class="notificacao-item${item.lida ? "" : " notificacao-nao-lida"}">
+      <span class="notificacao-icone" aria-hidden="true">${ICONE_POR_TIPO_NOTIFICACAO[item.tipo] || "🔔"}</span>
+      <div class="notificacao-texto">
+        <strong>${escaparHTML(item.titulo)}</strong>
+        <p>${escaparHTML(item.corpo)}</p>
+        <span class="notificacao-tempo">${mfTempoRelativo(item.created_at)}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function abrirNotificacoes() {
+  const overlay = document.getElementById("notificacoesOverlay");
+  if (!overlay) return;
+
+  await carregarNotificacoes();
+  renderizarNotificacoes();
+
+  const botaoTrigger = document.getElementById("botaoNotificacoes");
+  const origem = mfOrigemClique(botaoTrigger);
+  overlay.classList.remove("hidden");
+  const painel = document.getElementById("notificacoesPanel");
+  if (painel) {
+    if (origem) {
+      const r = painel.getBoundingClientRect();
+      const oy = r.height ? Math.max(0, Math.min(100, (origem.y - r.top) / r.height * 100)) : 50;
+      painel.style.transformOrigin = `100% ${oy.toFixed(1)}%`;
+    } else {
+      painel.style.transformOrigin = "";
+    }
+  }
+  botaoTrigger?.setAttribute("aria-expanded", "true");
+
+  const idsNaoLidas = notificacoes.filter(item => !item.lida).map(item => item.id);
+  if (idsNaoLidas.length) {
+    notificacoes = notificacoes.map(item => idsNaoLidas.includes(item.id) ? { ...item, lida: true } : item);
+    atualizarBadgeNotificacoes();
+    const { error } = await supabaseClient
+      .from("notificacoes")
+      .update({ lida: true })
+      .in("id", idsNaoLidas);
+    if (error) console.error("Falha ao marcar notificações como lidas:", error);
+  }
+}
+
+function fecharNotificacoes() {
+  const overlay = document.getElementById("notificacoesOverlay");
+  if (!overlay) return;
+  overlay.classList.add("hidden");
+  document.getElementById("botaoNotificacoes")?.setAttribute("aria-expanded", "false");
+}
+
+function mfCliqueForaNotificacoes(event) {
+  if (event.target.id === "notificacoesOverlay") fecharNotificacoes();
+}
+
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape") return;
+  const overlay = document.getElementById("notificacoesOverlay");
+  if (overlay && !overlay.classList.contains("hidden")) fecharNotificacoes();
 });
 
 function abrirPerfil() {
