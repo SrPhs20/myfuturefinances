@@ -11,7 +11,7 @@
   <link rel="alternate icon" href="favicon.ico?v=2" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <link rel="stylesheet" href="style.css?v=46" />
+  <link rel="stylesheet" href="style.css?v=47" />
 </head>
 <body>
   <div class="container">
@@ -252,6 +252,10 @@
           <option value="todos">Todos</option>
           <option value="receita">Receitas</option>
           <option value="despesa">Despesas</option>
+        </select>
+
+        <select id="filtroCategoria" onchange="atualizarTela()">
+          <option value="todas">Todas as categorias</option>
         </select>
       </div>
 
@@ -607,6 +611,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=45"></script>
+  <script src="script.js?v=46"></script>
 </body>
 </html>

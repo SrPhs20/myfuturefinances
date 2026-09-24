@@ -845,7 +845,7 @@ function gradienteCartaoCSS(banco) {
    restante do script (contrato de dados preservado). */
 const MF_SELECTS_REALCADOS = new Map();
 
-function mfRealcarSelect(selectId, { comCor = false } = {}) {
+function mfRealcarSelect(selectId, { comCor = false, corFn = corParaGrupo } = {}) {
   const select = document.getElementById(selectId);
   if (!select || MF_SELECTS_REALCADOS.has(selectId)) return;
 
@@ -973,7 +973,7 @@ function mfRealcarSelect(selectId, { comCor = false } = {}) {
   function render() {
     const itens = opcoes();
     listbox.innerHTML = itens.map((opt, indice) => {
-      const cor = comCor && opt.value ? corParaGrupo(opt.textContent) : null;
+      const cor = comCor && opt.value ? corFn(opt.textContent) : null;
       const ponto = comCor
         ? `<span class="select-option-dot" style="background:${cor ? cor.dot : "#b7c2bb"}" aria-hidden="true"></span>`
         : "";
@@ -989,7 +989,7 @@ function mfRealcarSelect(selectId, { comCor = false } = {}) {
     if (comCor) {
       const pontoTrigger = trigger.querySelector(".select-trigger-dot");
       if (pontoTrigger) {
-        const cor = selecionada && selecionada.value ? corParaGrupo(selecionada.textContent) : null;
+        const cor = selecionada && selecionada.value ? corFn(selecionada.textContent) : null;
         pontoTrigger.style.background = cor ? cor.dot : "#b7c2bb";
       }
     }
@@ -1050,6 +1050,7 @@ mfRealcarSelect("orcamentoCategoria");
 mfRealcarSelect("notificacaoAntecedencia");
 mfRealcarSelect("tipo");
 mfRealcarSelect("filtroTipo");
+mfRealcarSelect("filtroCategoria", { comCor: true, corFn: corParaCategoria });
 mfRealcarSelect("objetivoTipo");
 
 /* Objetivo do tipo "caixinha": uma reserva sem valor-alvo (o usuário só quer
@@ -1844,8 +1845,11 @@ document.addEventListener("keydown", event => {
 function atualizarTela() {
   lista.innerHTML = "";
 
+  atualizarOpcoesFiltroCategoria();
+
   const busca = document.getElementById("busca").value.toLowerCase();
   const filtroTipo = document.getElementById("filtroTipo").value;
+  const filtroCategoria = document.getElementById("filtroCategoria")?.value || "todas";
 
   let receitas = 0;
   let despesas = 0;
@@ -1866,7 +1870,10 @@ function atualizarTela() {
     const combinaTipo =
       filtroTipo === "todos" || item.tipo === filtroTipo;
 
-    return combinaBusca && combinaTipo;
+    const combinaCategoria =
+      filtroCategoria === "todas" || categoria === filtroCategoria;
+
+    return combinaBusca && combinaTipo && combinaCategoria;
   });
 
   filtrados.forEach(item => {
@@ -2334,6 +2341,24 @@ function atualizarOpcoesCategorias() {
     seletorOrcamento.value = nomes.includes(atual) ? atual : "";
     mfAtualizarSelectRealcado("orcamentoCategoria");
   }
+}
+
+/* Filtro por categoria na aba Lançamentos — mesma ideia do filtro por grupo
+   em Contas Fixas: só lista categorias que realmente aparecem nos
+   lançamentos já feitos (receita ou despesa), pra não poluir com categorias
+   cadastradas mas nunca usadas. */
+function atualizarOpcoesFiltroCategoria() {
+  const seletor = document.getElementById("filtroCategoria");
+  if (!seletor) return;
+
+  const nomes = Array.from(new Set(lancamentos.map(item => item.categoria).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  const atual = seletor.value || "todas";
+  seletor.innerHTML = `<option value="todas">Todas as categorias</option>${nomes.map(nome => `<option value="${escaparHTML(nome)}">${escaparHTML(nome)}</option>`).join("")}`;
+  seletor.value = atual === "todas" || nomes.includes(atual) ? atual : "todas";
+
+  mfAtualizarSelectRealcado("filtroCategoria");
 }
 
 document.getElementById("botaoNovaCategoria")?.addEventListener("click", () => {

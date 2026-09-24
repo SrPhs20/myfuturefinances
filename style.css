@@ -257,7 +257,7 @@ button:active {
 
 .filters {
   display: grid;
-  grid-template-columns: 1fr 180px;
+  grid-template-columns: 1fr 160px 200px;
   gap: 12px;
   margin-bottom: 22px;
 }
